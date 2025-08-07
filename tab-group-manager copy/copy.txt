@@ -1,0 +1,1478 @@
+manifest.json
+{
+  "manifest_version": 3,
+  "name": "Local Tab Group Manager",
+  "version": "2.0",
+  "description": "Organize your tabs into groups and manage them locally.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icon.png"
+  }
+}
+
+
+options.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tab Group Manager</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    #main {
+      display: flex;
+      gap: 40px;
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+      min-height: 600px; /* Ensure tall enough */
+    }
+    #open-tabs, #folders, #groups {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      transition: box-shadow 0.3s ease;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    #open-tabs:hover, #folders:hover, #groups:hover {
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 5px 0 10px 0;
+      flex-grow: 1;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    ul li {
+      padding: 8px 12px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: grab;
+      transition: background-color 0.2s ease;
+    }
+    ul li:hover {
+      background-color: #e6f0ff;
+    }
+
+    #folders input, #groups input {
+      padding: 8px;
+      width: calc(100% - 110px);
+      margin-top: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      transition: box-shadow 0.3s ease;
+    }
+    #folders button, #groups button {
+      width: 100px;
+      padding: 9px 10px;
+      margin-left: 10px;
+      cursor: pointer;
+      background-color: #2ecc71;
+      border: none;
+      color: white;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+    #folders button:hover, #groups button:hover {
+      background-color: #27ae60;
+    }
+    /* Scrollbar styling for better UX */
+    ul::-webkit-scrollbar {
+      width: 8px;
+    }
+    ul::-webkit-scrollbar-thumb {
+      background-color: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tab Group Manager</h1>
+  <div id="main">
+
+    <div id="open-tabs">
+      <h2>Open Tabs</h2>
+      <ul id="tab-list" class="dropzone"></ul>
+    </div>
+
+    <div id="folders">
+      <h2>Folders</h2>
+      <ul id="folder-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-folder-name" type="text" placeholder="New folder name" />
+        <button id="create-folder">+ Folder</button>
+      </div>
+    </div>
+
+    <div id="groups">
+      <h2>Groups in Folder</h2>
+      <ul id="group-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-group-name" type="text" placeholder="New group name" />
+        <button id="create-group">+ Group</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
+
+options.js
+document.addEventListener('DOMContentLoaded', () => {
+
+  const tabList = document.getElementById('tab-list');
+
+  const folderList = document.getElementById('folder-list');
+  const createFolderBtn = document.getElementById('create-folder');
+  const newFolderNameInput = document.getElementById('new-folder-name');
+
+  const groupList = document.getElementById('group-list');
+  const createGroupBtn = document.getElementById('create-group');
+  const newGroupNameInput = document.getElementById('new-group-name');
+
+  // State for persistent data and selection
+  let storageData = {
+    folders: {},  // folderName -> array of group names
+    groups: {}    // groupName -> array of urls (simple, to keep same as original)
+  };
+  let selectedFolder = null;
+
+  // --- UTILITIES ---
+
+  // Migrate old data structure to new with folders & groups keys
+  function migrateOldData(oldData) {
+    let changed = false;
+
+    if(!('folders' in oldData) && !('groups' in oldData)) {
+      // Old format: flat groups
+      const groups = {};
+      for (const key in oldData) {
+        if(Array.isArray(oldData[key])) {
+          groups[key] = oldData[key];
+        }
+      }
+      storageData.groups = groups;
+      storageData.folders = {};
+      changed = true;
+      chrome.storage.local.set(storageData);
+    } else {
+      // Already new format or empty
+      storageData.folders = oldData.folders || {};
+      storageData.groups = oldData.groups || {};
+    }
+    return changed;
+  }
+
+  // Save current storageData to chrome.storage.local
+  function saveStorage() {
+    chrome.storage.local.set(storageData);
+  }
+
+  // --- RENDER FUNCTIONS ---
+
+  // Render open tabs (drag sources)
+  function renderOpenTabs() {
+    tabList.innerHTML = '';
+    chrome.tabs.query({ currentWindow: true }, tabs => {
+      tabs.forEach(tab => {
+        const li = document.createElement('li');
+        li.textContent = `${tab.title} – ${new URL(tab.url).hostname}`;
+        li.draggable = true;
+        li.dataset.url = tab.url;
+        li.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', tab.url);
+        });
+        tabList.appendChild(li);
+      });
+    });
+  }
+
+  // Render folder list (select folder, delete folder)
+  function renderFolders() {
+    folderList.innerHTML = '';
+
+    // Add a special "Ungrouped" folder option if groups exist outside folders
+    const ungroupedGroupsExists = Object.keys(storageData.groups).some(groupName => {
+      return !Object.values(storageData.folders).some(foldersGroups => foldersGroups.includes(groupName));
+    });
+    if(ungroupedGroupsExists){
+      const li = createFolderListItem('Ungrouped');
+      folderList.appendChild(li);
+    }
+
+    Object.keys(storageData.folders).forEach(folderName => {
+      const li = createFolderListItem(folderName);
+      folderList.appendChild(li);
+    });
+  }
+
+  function createFolderListItem(name) {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.classList.toggle('selected', selectedFolder === name);
+    li.style.userSelect = 'none';
+
+    li.addEventListener('click', () => {
+      selectFolder(name);
+    });
+
+    // Make folder a dropzone to accept group drops
+    li.addEventListener('dragover', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '#d0e7ff';
+    });
+    li.addEventListener('dragleave', e => {
+      li.style.backgroundColor = '';
+    });
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '';
+      const groupName = e.dataTransfer.getData('text/plain');
+      if(groupName && storageData.groups[groupName]) {
+        moveGroupToFolder(groupName, name);
+      }
+    });
+
+    // Delete folder button (not for Ungrouped)
+    if(name !== 'Ungrouped'){
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.className = 'delete-group-btn';
+      delBtn.style.marginLeft = '10px';
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteFolder(name);
+      };
+      li.appendChild(delBtn);
+    }
+
+    return li;
+  }
+
+  // Render groups inside selected folder
+  function renderGroups() {
+    groupList.innerHTML = '';
+
+    if(!selectedFolder) return;
+
+    let groupsInFolder = [];
+
+    if(selectedFolder === 'Ungrouped'){
+      groupsInFolder = Object.keys(storageData.groups).filter(groupName => {
+        return !Object.values(storageData.folders).some(foldersGroups => foldersGroups.includes(groupName));
+      });
+    } else {
+      groupsInFolder = storageData.folders[selectedFolder] || [];
+    }
+
+    groupsInFolder.forEach(groupName => {
+      const ul = document.createElement('ul');
+      ul.classList.add('group', 'dropzone');
+      ul.dataset.name = groupName;
+
+      // Group title with delete button
+      const titleContainer = document.createElement('div');
+      const title = document.createElement('h3');
+      title.textContent = groupName;
+      titleContainer.appendChild(title);
+
+      const deleteGroupBtn = document.createElement('button');
+      deleteGroupBtn.textContent = 'Delete Group';
+      deleteGroupBtn.className = 'delete-group-btn';
+      deleteGroupBtn.addEventListener('click', () => {
+        deleteGroup(groupName);
+      });
+      titleContainer.appendChild(deleteGroupBtn);
+      ul.appendChild(titleContainer);
+
+      // Tabs inside group as li with delete buttons
+      storageData.groups[groupName].forEach(url => {
+        const li = document.createElement('li');
+        li.textContent = url;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.addEventListener('click', () => {
+          const index = storageData.groups[groupName].indexOf(url);
+          if(index !== -1) {
+            storageData.groups[groupName].splice(index, 1);
+            saveStorage();
+            renderGroups();
+          }
+        });
+
+        li.appendChild(deleteBtn);
+        ul.appendChild(li);
+      });
+
+      // Drag and drop tabs into group support
+      ul.addEventListener('dragover', e => e.preventDefault());
+      ul.addEventListener('drop', e => {
+        e.preventDefault();
+        const url = e.dataTransfer.getData('text/plain');
+        if(url && !storageData.groups[groupName].includes(url)) {
+          storageData.groups[groupName].push(url);
+          saveStorage();
+          renderGroups();
+        }
+      });
+
+      // Make group draggable to drag into folders
+      ul.draggable = true;
+      ul.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', groupName);
+      });
+
+      groupList.appendChild(ul);
+    });
+  }
+
+  // --- ACTIONS ---
+
+  function selectFolder(name) {
+    selectedFolder = name;
+    renderFolders();
+    renderGroups();
+  }
+
+  function createFolder(name) {
+    if(!name) {
+      alert('Please enter a folder name');
+      return;
+    }
+    if(storageData.folders[name]) {
+      alert('Folder exists already');
+      return;
+    }
+    storageData.folders[name] = [];
+    saveStorage();
+    newFolderNameInput.value = '';
+    selectFolder(name);
+  }
+
+  function deleteFolder(name) {
+    if(!confirm(`Delete folder "${name}"? Groups inside will become ungrouped.`)) return;
+    delete storageData.folders[name];
+    saveStorage();
+    if(selectedFolder === name) {
+      selectedFolder = null;
+    }
+    renderFolders();
+    renderGroups();
+  }
+
+  function createGroup(name) {
+    if(!name) {
+      alert('Please enter a group name');
+      return;
+    }
+    if(storageData.groups[name]) {
+      alert('Group exists already');
+      return;
+    }
+    storageData.groups[name] = [];
+    if(selectedFolder && selectedFolder !== 'Ungrouped') {
+      storageData.folders[selectedFolder].push(name);
+    }
+    saveStorage();
+    newGroupNameInput.value = '';
+    renderGroups();
+  }
+
+  function deleteGroup(name) {
+    if(!confirm(`Delete group "${name}" and all its tabs?`)) return;
+    delete storageData.groups[name];
+    // Remove from any folder
+    for(const folder in storageData.folders) {
+      const idx = storageData.folders[folder].indexOf(name);
+      if(idx !== -1) storageData.folders[folder].splice(idx, 1);
+    }
+    saveStorage();
+    renderGroups();
+  }
+
+  // Moves a group into a folder (or ungrouped if folderName === 'Ungrouped')
+  function moveGroupToFolder(groupName, folderName) {
+    // Remove from previous folder, if any
+    for(const folder in storageData.folders){
+      const idx = storageData.folders[folder].indexOf(groupName);
+      if(idx !== -1){
+        storageData.folders[folder].splice(idx, 1);
+        break;
+      }
+    }
+
+    if(folderName === 'Ungrouped'){
+      // Ungrouped -> no need to add to folders map
+    } else {
+      if(!storageData.folders[folderName]){
+        storageData.folders[folderName] = [];
+      }
+      storageData.folders[folderName].push(groupName);
+    }
+
+    saveStorage();
+    renderFolders();
+    renderGroups();
+  }
+
+  // --- EVENT LISTENERS ---
+
+  createFolderBtn.addEventListener('click', () => {
+    createFolder(newFolderNameInput.value.trim());
+  });
+
+  createGroupBtn.addEventListener('click', () => {
+    createGroup(newGroupNameInput.value.trim());
+  });
+
+  // Initial load routine
+  chrome.storage.local.get(null, data => {
+    if(migrateOldData(data)) {
+      // Migrated, reload after short delay to get saved new data
+      setTimeout(() => chrome.storage.local.get(null, newData => {
+        storageData = newData;
+        renderOpenTabs();
+        renderFolders();
+      }), 200);
+    } else {
+      renderOpenTabs();
+      renderFolders();
+      // Select first folder or Ungrouped
+      const folderNames = Object.keys(storageData.folders);
+      if(folderNames.length) {
+        selectFolder(folderNames[0]);
+      } else if(Object.keys(storageData.groups).length) {
+        selectFolder('Ungrouped');
+      }
+    }
+  });
+
+});
+
+popup.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tab Group Manager</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      width: 400px; /* Change the width */
+      height: 600px; /* Adjust the height as needed */
+    }
+  </style>
+</head>
+<body>
+  <h1>Tab Groups</h1>
+  <input id="group-name" type="text" placeholder="Group name">
+  <button id="save-group">Save Current Tabs</button>
+  <ul id="group-list"></ul>
+
+  <script src="popup.js"></script>
+  <a href="options.html" target="_blank">Open Tab Manager</a>
+</body>
+</html>
+
+popup.js
+document.addEventListener('DOMContentLoaded', () => {
+  const groupNameInput = document.getElementById('group-name');
+  const saveBtn = document.getElementById('save-group');
+  const groupList = document.getElementById('group-list');
+
+  function renderGroups() {
+    chrome.storage.local.get(null, (groups) => {
+      groupList.innerHTML = '';
+      for (const name in groups) {
+        const li = document.createElement('li');
+        li.textContent = name;
+
+        const openBtn = document.createElement('button');
+        openBtn.textContent = 'Open';
+        openBtn.onclick = () => {
+          groups[name].forEach(url => chrome.tabs.create({ url }));
+        };
+
+        li.appendChild(openBtn);
+        groupList.appendChild(li);
+      }
+    });
+  }
+
+  saveBtn.addEventListener('click', () => {
+    const name = groupNameInput.value.trim();
+    if (!name) return;
+
+    chrome.tabs.query({ currentWindow: true }, (tabs) => {
+      const urls = tabs.map(tab => tab.url);
+      chrome.storage.local.set({ [name]: urls }, renderGroups);
+      groupNameInput.value = '';
+    });
+  });
+
+  renderGroups();
+});
+
+style.css
+/* Basic Styles */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f2f4f8;
+  color: #333;
+  margin: 0;
+  padding: 20px;
+  overflow-x: hidden;
+}
+
+/* Headers */
+h1, h2, h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  transition: color 0.3s ease;
+}
+
+h1:hover, h2:hover, h3:hover {
+  color: #3498db;
+}
+
+/* Main Section */
+#main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  opacity: 0;
+  animation: fadeIn 1s forwards;
+}
+
+/* Containers */
+#open-tabs, #groups {
+  flex: 1 1 45%;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+#open-tabs:hover, #groups:hover {
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* List Styles */
+ul, .group {
+  list-style: none;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  min-height: 100px;
+  background: #fafafa;
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+  opacity: 0;
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+/* Tab List Items */
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #ffffff;
+  margin: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: grab;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.3s ease;
+}
+
+li:hover {
+  background-color: #e6f0ff;
+  transform: scale(1.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Group Container Styling */
+.group {
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Buttons */
+button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  margin-left: 10px;
+}
+
+button:hover {
+  background-color: #2980b9;
+  transform: scale(1.05);
+}
+
+/* Group Creation Button */
+#create-group {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  background-color: #2ecc71;
+  transition: background-color 0.3s ease;
+}
+
+#create-group:hover {
+  background-color: #27ae60;
+}
+
+/* Delete Group Button */
+.delete-group-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.delete-group-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Delete Tab Button */
+.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.delete-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Smooth Input Styles */
+input[type="text"] {
+  padding: 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  width: calc(100% - 20px);
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  transition: box-shadow 0.3s ease;
+}
+
+input[type="text"]:focus {
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.8);
+  outline: none;
+}
+
+/* Fade In and Slide In Animations */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+copy.txt
+manifest.json
+{
+  "manifest_version": 3,
+  "name": "Local Tab Group Manager",
+  "version": "2.0",
+  "description": "Organize your tabs into groups and manage them locally.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icon.png"
+  }
+}
+
+
+options.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tab Group Manager</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    #main {
+      display: flex;
+      gap: 40px;
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+      min-height: 600px; /* Ensure tall enough */
+    }
+    #open-tabs, #folders, #groups {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      transition: box-shadow 0.3s ease;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    #open-tabs:hover, #folders:hover, #groups:hover {
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 5px 0 10px 0;
+      flex-grow: 1;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    ul li {
+      padding: 8px 12px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: grab;
+      transition: background-color 0.2s ease;
+    }
+    ul li:hover {
+      background-color: #e6f0ff;
+    }
+
+    #folders input, #groups input {
+      padding: 8px;
+      width: calc(100% - 110px);
+      margin-top: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      transition: box-shadow 0.3s ease;
+    }
+    #folders button, #groups button {
+      width: 100px;
+      padding: 9px 10px;
+      margin-left: 10px;
+      cursor: pointer;
+      background-color: #2ecc71;
+      border: none;
+      color: white;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+    #folders button:hover, #groups button:hover {
+      background-color: #27ae60;
+    }
+    /* Scrollbar styling for better UX */
+    ul::-webkit-scrollbar {
+      width: 8px;
+    }
+    ul::-webkit-scrollbar-thumb {
+      background-color: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tab Group Manager</h1>
+  <div id="main">
+
+    <div id="open-tabs">
+      <h2>Open Tabs</h2>
+      <ul id="tab-list" class="dropzone"></ul>
+    </div>
+
+    <div id="folders">
+      <h2>Folders</h2>
+      <ul id="folder-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-folder-name" type="text" placeholder="New folder name" />
+        <button id="create-folder">+ Folder</button>
+      </div>
+    </div>
+
+    <div id="groups">
+      <h2>Groups in Folder</h2>
+      <ul id="group-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-group-name" type="text" placeholder="New group name" />
+        <button id="create-group">+ Group</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
+
+options.js
+document.addEventListener('DOMContentLoaded', () => {
+
+  const tabList = document.getElementById('tab-list');
+
+  const folderList = document.getElementById('folder-list');
+  const createFolderBtn = document.getElementById('create-folder');
+  const newFolderNameInput = document.getElementById('new-folder-name');
+
+  const groupList = document.getElementById('group-list');
+  const createGroupBtn = document.getElementById('create-group');
+  const newGroupNameInput = document.getElementById('new-group-name');
+
+  // State for persistent data and selection
+  let storageData = {
+    folders: {},  // folderName -> array of group names
+    groups: {}    // groupName -> array of urls (simple, to keep same as original)
+  };
+  let selectedFolder = null;
+
+  // --- UTILITIES ---
+
+  // Migrate old data structure to new with folders & groups keys
+  function migrateOldData(oldData) {
+    let changed = false;
+
+    if(!('folders' in oldData) && !('groups' in oldData)) {
+      // Old format: flat groups
+      const groups = {};
+      for (const key in oldData) {
+        if(Array.isArray(oldData[key])) {
+          groups[key] = oldData[key];
+        }
+      }
+      storageData.groups = groups;
+      storageData.folders = {};
+      changed = true;
+      chrome.storage.local.set(storageData);
+    } else {
+      // Already new format or empty
+      storageData.folders = oldData.folders || {};
+      storageData.groups = oldData.groups || {};
+    }
+    return changed;
+  }
+
+  // Save current storageData to chrome.storage.local
+  function saveStorage() {
+    chrome.storage.local.set(storageData);
+  }
+
+  // --- RENDER FUNCTIONS ---
+
+  // Render open tabs (drag sources)
+  function renderOpenTabs() {
+    tabList.innerHTML = '';
+    chrome.tabs.query({ currentWindow: true }, tabs => {
+      tabs.forEach(tab => {
+        const li = document.createElement('li');
+        li.textContent = `${tab.title} – ${new URL(tab.url).hostname}`;
+        li.draggable = true;
+        li.dataset.url = tab.url;
+        li.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', tab.url);
+        });
+        tabList.appendChild(li);
+      });
+    });
+  }
+
+  // Render folder list (select folder, delete folder)
+  function renderFolders() {
+    folderList.innerHTML = '';
+
+    // Add a special "Ungrouped" folder option if groups exist outside folders
+    const ungroupedGroupsExists = Object.keys(storageData.groups).some(groupName => {
+      return !Object.values(storageData.folders).some(foldersGroups => foldersGroups.includes(groupName));
+    });
+    if(ungroupedGroupsExists){
+      const li = createFolderListItem('Ungrouped');
+      folderList.appendChild(li);
+    }
+
+    Object.keys(storageData.folders).forEach(folderName => {
+      const li = createFolderListItem(folderName);
+      folderList.appendChild(li);
+    });
+  }
+
+  function createFolderListItem(name) {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.classList.toggle('selected', selectedFolder === name);
+    li.style.userSelect = 'none';
+
+    li.addEventListener('click', () => {
+      selectFolder(name);
+    });
+
+    // Make folder a dropzone to accept group drops
+    li.addEventListener('dragover', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '#d0e7ff';
+    });
+    li.addEventListener('dragleave', e => {
+      li.style.backgroundColor = '';
+    });
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '';
+      const groupName = e.dataTransfer.getData('text/plain');
+      if(groupName && storageData.groups[groupName]) {
+        moveGroupToFolder(groupName, name);
+      }
+    });
+
+    // Delete folder button (not for Ungrouped)
+    if(name !== 'Ungrouped'){
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.className = 'delete-group-btn';
+      delBtn.style.marginLeft = '10px';
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteFolder(name);
+      };
+      li.appendChild(delBtn);
+    }
+
+    return li;
+  }
+
+  // Render groups inside selected folder
+  function renderGroups() {
+    groupList.innerHTML = '';
+
+    if(!selectedFolder) return;
+
+    let groupsInFolder = [];
+
+    if(selectedFolder === 'Ungrouped'){
+      groupsInFolder = Object.keys(storageData.groups).filter(groupName => {
+        return !Object.values(storageData.folders).some(foldersGroups => foldersGroups.includes(groupName));
+      });
+    } else {
+      groupsInFolder = storageData.folders[selectedFolder] || [];
+    }
+
+    groupsInFolder.forEach(groupName => {
+      const ul = document.createElement('ul');
+      ul.classList.add('group', 'dropzone');
+      ul.dataset.name = groupName;
+
+      // Group title with delete button
+      const titleContainer = document.createElement('div');
+      const title = document.createElement('h3');
+      title.textContent = groupName;
+      titleContainer.appendChild(title);
+
+      const deleteGroupBtn = document.createElement('button');
+      deleteGroupBtn.textContent = 'Delete Group';
+      deleteGroupBtn.className = 'delete-group-btn';
+      deleteGroupBtn.addEventListener('click', () => {
+        deleteGroup(groupName);
+      });
+      titleContainer.appendChild(deleteGroupBtn);
+      ul.appendChild(titleContainer);
+
+      // Tabs inside group as li with delete buttons
+      storageData.groups[groupName].forEach(url => {
+        const li = document.createElement('li');
+        li.textContent = url;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.addEventListener('click', () => {
+          const index = storageData.groups[groupName].indexOf(url);
+          if(index !== -1) {
+            storageData.groups[groupName].splice(index, 1);
+            saveStorage();
+            renderGroups();
+          }
+        });
+
+        li.appendChild(deleteBtn);
+        ul.appendChild(li);
+      });
+
+      // Drag and drop tabs into group support
+      ul.addEventListener('dragover', e => e.preventDefault());
+      ul.addEventListener('drop', e => {
+        e.preventDefault();
+        const url = e.dataTransfer.getData('text/plain');
+        if(url && !storageData.groups[groupName].includes(url)) {
+          storageData.groups[groupName].push(url);
+          saveStorage();
+          renderGroups();
+        }
+      });
+
+      // Make group draggable to drag into folders
+      ul.draggable = true;
+      ul.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', groupName);
+      });
+
+      groupList.appendChild(ul);
+    });
+  }
+
+  // --- ACTIONS ---
+
+  function selectFolder(name) {
+    selectedFolder = name;
+    renderFolders();
+    renderGroups();
+  }
+
+  function createFolder(name) {
+    if(!name) {
+      alert('Please enter a folder name');
+      return;
+    }
+    if(storageData.folders[name]) {
+      alert('Folder exists already');
+      return;
+    }
+    storageData.folders[name] = [];
+    saveStorage();
+    newFolderNameInput.value = '';
+    selectFolder(name);
+  }
+
+  function deleteFolder(name) {
+    if(!confirm(`Delete folder "${name}"? Groups inside will become ungrouped.`)) return;
+    delete storageData.folders[name];
+    saveStorage();
+    if(selectedFolder === name) {
+      selectedFolder = null;
+    }
+    renderFolders();
+    renderGroups();
+  }
+
+  function createGroup(name) {
+    if(!name) {
+      alert('Please enter a group name');
+      return;
+    }
+    if(storageData.groups[name]) {
+      alert('Group exists already');
+      return;
+    }
+    storageData.groups[name] = [];
+    if(selectedFolder && selectedFolder !== 'Ungrouped') {
+      storageData.folders[selectedFolder].push(name);
+    }
+    saveStorage();
+    newGroupNameInput.value = '';
+    renderGroups();
+  }
+
+  function deleteGroup(name) {
+    if(!confirm(`Delete group "${name}" and all its tabs?`)) return;
+    delete storageData.groups[name];
+    // Remove from any folder
+    for(const folder in storageData.folders) {
+      const idx = storageData.folders[folder].indexOf(name);
+      if(idx !== -1) storageData.folders[folder].splice(idx, 1);
+    }
+    saveStorage();
+    renderGroups();
+  }
+
+  // Moves a group into a folder (or ungrouped if folderName === 'Ungrouped')
+  function moveGroupToFolder(groupName, folderName) {
+    // Remove from previous folder, if any
+    for(const folder in storageData.folders){
+      const idx = storageData.folders[folder].indexOf(groupName);
+      if(idx !== -1){
+        storageData.folders[folder].splice(idx, 1);
+        break;
+      }
+    }
+
+    if(folderName === 'Ungrouped'){
+      // Ungrouped -> no need to add to folders map
+    } else {
+      if(!storageData.folders[folderName]){
+        storageData.folders[folderName] = [];
+      }
+      storageData.folders[folderName].push(groupName);
+    }
+
+    saveStorage();
+    renderFolders();
+    renderGroups();
+  }
+
+  // --- EVENT LISTENERS ---
+
+  createFolderBtn.addEventListener('click', () => {
+    createFolder(newFolderNameInput.value.trim());
+  });
+
+  createGroupBtn.addEventListener('click', () => {
+    createGroup(newGroupNameInput.value.trim());
+  });
+
+  // Initial load routine
+  chrome.storage.local.get(null, data => {
+    if(migrateOldData(data)) {
+      // Migrated, reload after short delay to get saved new data
+      setTimeout(() => chrome.storage.local.get(null, newData => {
+        storageData = newData;
+        renderOpenTabs();
+        renderFolders();
+      }), 200);
+    } else {
+      renderOpenTabs();
+      renderFolders();
+      // Select first folder or Ungrouped
+      const folderNames = Object.keys(storageData.folders);
+      if(folderNames.length) {
+        selectFolder(folderNames[0]);
+      } else if(Object.keys(storageData.groups).length) {
+        selectFolder('Ungrouped');
+      }
+    }
+  });
+
+});
+
+popup.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tab Group Manager</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      width: 400px; /* Change the width */
+      height: 600px; /* Adjust the height as needed */
+    }
+  </style>
+</head>
+<body>
+  <h1>Tab Groups</h1>
+  <input id="group-name" type="text" placeholder="Group name">
+  <button id="save-group">Save Current Tabs</button>
+  <ul id="group-list"></ul>
+
+  <script src="popup.js"></script>
+  <a href="options.html" target="_blank">Open Tab Manager</a>
+</body>
+</html>
+
+popup.js
+document.addEventListener('DOMContentLoaded', () => {
+  const groupNameInput = document.getElementById('group-name');
+  const saveBtn = document.getElementById('save-group');
+  const groupList = document.getElementById('group-list');
+
+  function renderGroups() {
+    chrome.storage.local.get(null, (groups) => {
+      groupList.innerHTML = '';
+      for (const name in groups) {
+        const li = document.createElement('li');
+        li.textContent = name;
+
+        const openBtn = document.createElement('button');
+        openBtn.textContent = 'Open';
+        openBtn.onclick = () => {
+          groups[name].forEach(url => chrome.tabs.create({ url }));
+        };
+
+        li.appendChild(openBtn);
+        groupList.appendChild(li);
+      }
+    });
+  }
+
+  saveBtn.addEventListener('click', () => {
+    const name = groupNameInput.value.trim();
+    if (!name) return;
+
+    chrome.tabs.query({ currentWindow: true }, (tabs) => {
+      const urls = tabs.map(tab => tab.url);
+      chrome.storage.local.set({ [name]: urls }, renderGroups);
+      groupNameInput.value = '';
+    });
+  });
+
+  renderGroups();
+});
+
+style.css
+/* Basic Styles */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f2f4f8;
+  color: #333;
+  margin: 0;
+  padding: 20px;
+  overflow-x: hidden;
+}
+
+/* Headers */
+h1, h2, h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  transition: color 0.3s ease;
+}
+
+h1:hover, h2:hover, h3:hover {
+  color: #3498db;
+}
+
+/* Main Section */
+#main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  opacity: 0;
+  animation: fadeIn 1s forwards;
+}
+
+/* Containers */
+#open-tabs, #groups {
+  flex: 1 1 45%;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+#open-tabs:hover, #groups:hover {
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* List Styles */
+ul, .group {
+  list-style: none;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  min-height: 100px;
+  background: #fafafa;
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+  opacity: 0;
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+/* Tab List Items */
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #ffffff;
+  margin: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: grab;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.3s ease;
+}
+
+li:hover {
+  background-color: #e6f0ff;
+  transform: scale(1.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Group Container Styling */
+.group {
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Buttons */
+button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  margin-left: 10px;
+}
+
+button:hover {
+  background-color: #2980b9;
+  transform: scale(1.05);
+}
+
+/* Group Creation Button */
+#create-group {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  background-color: #2ecc71;
+  transition: background-color 0.3s ease;
+}
+
+#create-group:hover {
+  background-color: #27ae60;
+}
+
+/* Delete Group Button */
+.delete-group-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.delete-group-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Delete Tab Button */
+.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.delete-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Smooth Input Styles */
+input[type="text"] {
+  padding: 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  width: calc(100% - 20px);
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  transition: box-shadow 0.3s ease;
+}
+
+input[type="text"]:focus {
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.8);
+  outline: none;
+}
+
+/* Fade In and Slide In Animations */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+copy.txt
+manifest.json
+{
+  "manifest_version": 3,
+  "name": "Local Tab Group Manager",
+  "version": "2.0",
+  "description": "Organize your tabs into groups and manage them locally.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "defa
