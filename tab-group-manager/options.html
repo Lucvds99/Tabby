@@ -78,7 +78,7 @@
       display: flex;
       align-items: center;
       width: 100%;
-      justify-content: space-between; /* buttons to right, name + caret left */
+      justify-content: space-between; /* buttons to right, caret+name left */
     }
 
     /* Caret */
@@ -100,22 +100,6 @@
       transform: rotate(90deg);
     }
 
-    /* Name label - truncated */
-    .name {
-      flex-grow: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      padding-right: 10px;
-      user-select: text;
-    }
-
-    /* Buttons container */
-    .buttons {
-      display: flex;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
     /* Nested dropdown list */
     ul.nested {
       display: block;
@@ -134,11 +118,30 @@
 
     /* Nested list items text truncated */
     ul.nested li {
+      display: flex;
+      flex-direction: column; /* outer stacking */
+      padding: 8px 12px;
+    }
+
+    ul.nested li > .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
       white-space: nowrap;
+    }
+
+    .name {
+      flex-grow: 1;
       overflow: hidden;
       text-overflow: ellipsis;
-      padding-right: 8px;
     }
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
 
     /* Buttons */
 
@@ -152,6 +155,18 @@
       user-select: none;
     }
 
+        #folders button, #groups button {
+      padding: 9px 10px;
+      margin-left: 10px;
+      cursor: pointer;
+      background-color: #2ecc71;
+      border: none;
+      color: white;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+
     button.open-btn {
       background-color: #27ae60;
       color: white;
@@ -161,19 +176,19 @@
     }
 
     button.remove-btn {
-      background-color: #f39c12;
+      background-color: #f39c12 !important;
       color: white;
     }
     button.remove-btn:hover {
-      background-color: #d88f10;
+      background-color: #d88f10 !important;
     }
 
     button.delete-btn, button.delete-group-btn {
-      background-color: #e74c3c;
+      background-color: #e74c3c !important;
       color: white;
     }
     button.delete-btn:hover, button.delete-group-btn:hover {
-      background-color: #c0392b;
+      background-color: #c0392b !important;
     }
 
     /* Input and buttons for creating group and folder */
@@ -188,22 +203,8 @@
       transition: box-shadow 0.3s ease;
     }
 
-    #folders button, #groups button {
-      width: 100px;
-      padding: 9px 10px;
-      margin-left: 10px;
-      cursor: pointer;
-      background-color: #2ecc71;
-      border: none;
-      color: white;
-      font-size: 0.9rem;
-      border-radius: 6px;
-      transition: background-color 0.3s ease;
-    }
 
-    #folders button:hover, #groups button:hover {
-      background-color: #27ae60;
-    }
+
 
     /* Scrollbar styling */
     ul::-webkit-scrollbar {
@@ -214,12 +215,11 @@
       border-radius: 4px;
     }
 
-    /* Fade and slide animations */
+    /* Fade in animation */
     @keyframes fadeIn {
       0% { opacity: 0; }
       100% { opacity: 1; }
     }
-
   </style>
 </head>
 <body>

@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // State storage: folders and groups
   let storageData = {
     folders: {},  // folderName -> array of groupNames
-    groups: {}    // groupName -> array of tab URLs
+    groups: {}    // groupName -> array of tab objects {title, url}
   };
 
   // Track expanded groups in Groups panel separately from groups inside folders
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Utilities ---
 
   function getExpandedFolderGroups(folderName) {
-    if(!expandedFolderGroups.has(folderName)) {
+    if (!expandedFolderGroups.has(folderName)) {
       expandedFolderGroups.set(folderName, new Set());
     }
     return expandedFolderGroups.get(folderName);
@@ -39,12 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function migrateOldData(oldData) {
     let changed = false;
 
-    if(!('folders' in oldData) && !('groups' in oldData)) {
-      // Old format: flat groups only
+    if (!('folders' in oldData) && !('groups' in oldData)) {
+      // Old format: flat groups only, tabs as string URLs
       const groups = {};
       for (const key in oldData) {
-        if(Array.isArray(oldData[key])) {
-          groups[key] = oldData[key];
+        if (Array.isArray(oldData[key])) {
+          // Migrate tabs to objects with title=url for existing data
+          groups[key] = oldData[key].map(url => ({ title: url, url }));
         }
       }
       storageData.groups = groups;
@@ -52,8 +53,19 @@ document.addEventListener('DOMContentLoaded', () => {
       changed = true;
       chrome.storage.local.set(storageData);
     } else {
+      // Migrate any groups with tabs as strings to tabs as objects
       storageData.folders = oldData.folders || {};
       storageData.groups = oldData.groups || {};
+      for (const groupName in storageData.groups) {
+        const tabs = storageData.groups[groupName];
+        if (tabs.length > 0 && typeof tabs[0] === 'string') {
+          storageData.groups[groupName] = tabs.map(url => ({ title: url, url }));
+          changed = true;
+        }
+      }
+      if (changed) {
+        chrome.storage.local.set(storageData);
+      }
     }
     return changed;
   }
@@ -66,11 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.tabs.query({ currentWindow: true }, tabs => {
       tabs.forEach(tab => {
         const li = document.createElement('li');
-        li.textContent = `${tab.title} – ${new URL(tab.url).hostname}`;
+        li.textContent = tab.title || tab.url;
         li.setAttribute('draggable', 'true');
-        li.dataset.url = tab.url;
+
+        const tabObj = { title: tab.title || tab.url, url: tab.url };
+        li.dataset.tab = JSON.stringify(tabObj);
+
         li.addEventListener('dragstart', e => {
-          e.dataTransfer.setData('text/plain', tab.url);
+          e.dataTransfer.setData('application/json', li.dataset.tab);
         });
         tabList.appendChild(li);
       });
@@ -141,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     openBtn.title = `Open all tabs in group "${groupName}"`;
     openBtn.addEventListener('click', e => {
       e.stopPropagation();
-      tabs.forEach(url => chrome.tabs.create({ url }));
+      tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
     });
     buttonsDiv.appendChild(openBtn);
 
@@ -171,9 +186,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (expandedGroups.has(groupName)) {
       const tabUL = document.createElement('ul');
       tabUL.className = 'nested';
-      tabs.forEach((url, index) => {
+
+      tabs.forEach((tab, index) => {
         const tabLI = document.createElement('li');
-        tabLI.textContent = url;
+
+        // Flex container for tab title and buttons
+        const tabRow = document.createElement('div');
+        tabRow.classList.add('header-row');
+
+        // Title span
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = tab.title || tab.url || 'Untitled';
+        titleSpan.classList.add('name');
+        tabRow.appendChild(titleSpan);
+
+        // Buttons container
+        const buttonsDivTab = document.createElement('div');
+        buttonsDivTab.classList.add('buttons');
 
         // Open tab button
         const openTabBtn = document.createElement('button');
@@ -182,35 +211,47 @@ document.addEventListener('DOMContentLoaded', () => {
         openTabBtn.title = 'Open tab';
         openTabBtn.addEventListener('click', e => {
           e.stopPropagation();
-          chrome.tabs.create({ url });
+          chrome.tabs.create({ url: tab.url });
         });
-        tabLI.appendChild(openTabBtn);
+        buttonsDivTab.appendChild(openTabBtn);
 
-        // Delete tab button (removes tab from group)
+        // Delete tab button
         const deleteTabBtn = document.createElement('button');
         deleteTabBtn.textContent = 'Delete';
         deleteTabBtn.classList.add('delete-btn');
         deleteTabBtn.title = 'Remove tab from group';
         deleteTabBtn.addEventListener('click', e => {
           e.stopPropagation();
-          storageData.groups[groupName].splice(index, 1);
-          saveStorage();
-          renderGroups();
+          const idx = storageData.groups[groupName].findIndex(t => t.url === tab.url);
+          if (idx !== -1) {
+            storageData.groups[groupName].splice(idx, 1);
+            saveStorage();
+            renderGroups();
+          }
         });
-        tabLI.appendChild(deleteTabBtn);
+        buttonsDivTab.appendChild(deleteTabBtn);
+
+        tabRow.appendChild(buttonsDivTab);
+        tabLI.appendChild(tabRow);
 
         tabUL.appendChild(tabLI);
       });
+
       li.appendChild(tabUL);
     }
 
-    // Accept drag of tabs into group to add urls
+    // Accept drag of tabs into group to add tab objects
     li.addEventListener('dragover', e => e.preventDefault());
     li.addEventListener('drop', e => {
       e.preventDefault();
-      const url = e.dataTransfer.getData('text/plain');
-      if (url && !tabs.includes(url)) {
-        storageData.groups[groupName].push(url);
+      let tabObj;
+      try {
+        tabObj = JSON.parse(e.dataTransfer.getData('application/json'));
+      } catch {
+        return;
+      }
+      if (tabObj && tabObj.url && !tabs.some(t => t.url === tabObj.url)) {
+        storageData.groups[groupName].push(tabObj);
         saveStorage();
         renderGroups();
       }
@@ -285,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.stopPropagation();
       groupNames.forEach(gName => {
         const tabs = storageData.groups[gName];
-        if (tabs) tabs.forEach(url => chrome.tabs.create({ url }));
+        if (tabs) tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
       });
     });
     buttonsDiv.appendChild(openBtn);
@@ -302,7 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
     buttonsDiv.appendChild(deleteBtn);
 
     headerRow.appendChild(buttonsDiv);
-
     li.appendChild(headerRow);
 
     // Dropdown listing groups in folder with their own dropdowns
@@ -312,11 +352,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       groupNames.slice().sort().forEach(groupName => {
         const tabs = storageData.groups[groupName];
-        if (!tabs) return; // group might be deleted
+        if (!tabs) return;
 
-        // Create group item for folder panel using a separate function with separate expanded state
         const groupLI = createGroupListItemForFolderPanel(folderName, groupName, tabs);
-
         groupsUL.appendChild(groupLI);
       });
 
@@ -354,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerRow = document.createElement('div');
     headerRow.classList.add('header-row');
 
-    // Caret for expand/collapse
+    // Caret
     const caret = document.createElement('span');
     caret.textContent = '▶';
     caret.className = 'caret';
@@ -370,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         expandedSet.add(groupName);
       }
-      renderFolders();  // re-render folders panel only
+      renderFolders();
     });
     headerRow.appendChild(caret);
 
@@ -389,22 +427,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     headerRow.appendChild(nameSpan);
 
-    // Buttons container for group in folder
+    // Buttons container
     const buttonsDiv = document.createElement('div');
     buttonsDiv.classList.add('buttons');
 
-    // Open button to open all tabs in this group
+    // Open button
     const openBtn = document.createElement('button');
     openBtn.textContent = 'Open';
     openBtn.classList.add('open-btn');
     openBtn.title = `Open all tabs in group "${groupName}"`;
     openBtn.addEventListener('click', e => {
       e.stopPropagation();
-      tabs.forEach(url => chrome.tabs.create({ url }));
+      tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
     });
     buttonsDiv.appendChild(openBtn);
 
-    // Remove button (remove from folder, without deleting group)
+    // Remove button: remove group from folder
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
     removeBtn.className = 'remove-btn';
@@ -415,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     buttonsDiv.appendChild(removeBtn);
 
-    // Delete button (deletes whole group)
+    // Delete button (deletes group fully)
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = 'Delete';
     deleteBtn.className = 'delete-group-btn delete-btn';
@@ -427,40 +465,59 @@ document.addEventListener('DOMContentLoaded', () => {
     buttonsDiv.appendChild(deleteBtn);
 
     headerRow.appendChild(buttonsDiv);
-
     li.appendChild(headerRow);
 
     // Dropdown tabs list if expanded
-    if(isExpanded) {
+    if (isExpanded) {
       const tabUL = document.createElement('ul');
       tabUL.className = 'nested';
-      tabs.forEach((url, index) => {
+      tabs.forEach((tab, index) => {
         const tabLI = document.createElement('li');
-        tabLI.textContent = url;
 
-        // Open single tab button
+        // Flex container for tab title and buttons
+        const tabRow = document.createElement('div');
+        tabRow.classList.add('header-row');
+
+        // Title span
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = tab.title || tab.url || 'Untitled';
+        titleSpan.classList.add('name');
+        tabRow.appendChild(titleSpan);
+
+        // Buttons container
+        const buttonsDivTab = document.createElement('div');
+        buttonsDivTab.classList.add('buttons');
+
+        // Open tab button
         const openTabBtn = document.createElement('button');
         openTabBtn.textContent = 'Open';
         openTabBtn.classList.add('open-btn');
         openTabBtn.title = 'Open tab';
         openTabBtn.addEventListener('click', e => {
           e.stopPropagation();
-          chrome.tabs.create({ url });
+          chrome.tabs.create({ url: tab.url });
         });
-        tabLI.appendChild(openTabBtn);
+        buttonsDivTab.appendChild(openTabBtn);
 
-        // Delete tab button (removes tab from group)
+        // Delete tab button
         const deleteTabBtn = document.createElement('button');
         deleteTabBtn.textContent = 'Delete';
         deleteTabBtn.classList.add('delete-btn');
         deleteTabBtn.title = 'Remove tab from group';
         deleteTabBtn.addEventListener('click', e => {
           e.stopPropagation();
-          storageData.groups[groupName].splice(index, 1);
-          saveStorage();
-          renderFolders();
+          const groupTabs = storageData.groups[groupName];
+          const idx = groupTabs.findIndex(t => t.url === tab.url);
+          if (idx !== -1) {
+            groupTabs.splice(idx, 1);
+            saveStorage();
+            renderFolders();
+          }
         });
-        tabLI.appendChild(deleteTabBtn);
+        buttonsDivTab.appendChild(deleteTabBtn);
+
+        tabRow.appendChild(buttonsDivTab);
+        tabLI.appendChild(tabRow);
 
         tabUL.appendChild(tabLI);
       });
@@ -472,24 +529,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Actions ---
 
-  // Delete a group entirely (removes from all folders)
   function deleteGroup(groupName) {
-    if(!confirm(`Delete group "${groupName}" and all its tabs? This action cannot be undone.`)) return;
+    if (!confirm(`Delete group "${groupName}" and all its tabs? This action cannot be undone.`)) return;
     delete storageData.groups[groupName];
     Object.keys(storageData.folders).forEach(folder => {
       storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
     });
     saveStorage();
     expandedGroups.delete(groupName);
-    // Also remove from expandedFolderGroups in all folders
     expandedFolderGroups.forEach(set => set.delete(groupName));
     renderGroups();
     renderFolders();
   }
 
-  // Delete folder only (does NOT delete groups)
   function deleteFolder(folderName) {
-    if(!confirm(`Delete folder "${folderName}"? Groups inside will become unassigned.`)) return;
+    if (!confirm(`Delete folder "${folderName}"? Groups inside will become unassigned.`)) return;
     delete storageData.folders[folderName];
     saveStorage();
     expandedFolders.delete(folderName);
@@ -497,24 +551,21 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFolders();
   }
 
-  // Remove a group from a folder (does not delete the group)
   function removeGroupFromFolder(groupName, folderName) {
     if (!storageData.folders[folderName]) return;
     storageData.folders[folderName] = storageData.folders[folderName].filter(g => g !== groupName);
     saveStorage();
-    // Close group dropdown if open in folder UI
     const expandedSet = getExpandedFolderGroups(folderName);
     expandedSet.delete(groupName);
     renderFolders();
   }
 
-  // Create group
   function createGroup(name) {
-    if(!name) {
+    if (!name) {
       alert('Please enter a group name');
       return;
     }
-    if(storageData.groups[name]) {
+    if (storageData.groups[name]) {
       alert('Group already exists');
       return;
     }
@@ -523,13 +574,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderGroups();
   }
 
-  // Create folder
   function createFolder(name) {
-    if(!name) {
+    if (!name) {
       alert('Please enter a folder name');
       return;
     }
-    if(storageData.folders[name]) {
+    if (storageData.folders[name]) {
       alert('Folder already exists');
       return;
     }
@@ -538,13 +588,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFolders();
   }
 
-  // Assign group to folder (remove from any existing folder first)
   function moveGroupToFolder(groupName, folderName) {
     Object.keys(storageData.folders).forEach(folder => {
       storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
     });
     if (!storageData.folders[folderName]) storageData.folders[folderName] = [];
-    if(!storageData.folders[folderName].includes(groupName)) {
+    if (!storageData.folders[folderName].includes(groupName)) {
       storageData.folders[folderName].push(groupName);
     }
     saveStorage();
