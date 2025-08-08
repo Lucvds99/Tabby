@@ -2,19 +2,15 @@
 
 **Version 3.1.2**
 
-A sleek, minimalistic Chromium extension to organize and manage your browser tabs with bright purple-accented interface.
+[Version](https://img.shields.io/badge/version-3.1.2-brightgreen?style=for-the-badge)
+
+[License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
+
+[Browser](https://img.shields.io/badge/browser-Chromium%20based-purple?style=for-the-badge)
+
+A sleek, minimalistic Chromium extension to organize and manage your browser tabs with a **glassmorphic**, bright purple-accented interface.
 
 **Tabby keeps your browser tidy and your RAM happy!**
-
----
-
-## 📚 Table of Contents
-
-- [What is Tabby?](https://www.notion.so/249db06911fa80469e90ef4b9eecbca4?pvs=21)
-- [✨ Features](https://www.notion.so/249db06911fa80469e90ef4b9eecbca4?pvs=21)
-- [📦 Installation (Local)](https://www.notion.so/249db06911fa80469e90ef4b9eecbca4?pvs=21)
-- [🚀 Usage](https://www.notion.so/249db06911fa80469e90ef4b9eecbca4?pvs=21)
-- [🛠 Development](https://www.notion.so/249db06911fa80469e90ef4b9eecbca4?pvs=21)
 
 ---
 
