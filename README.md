@@ -2,13 +2,7 @@
 
 **Version 3.1.2**
 
-[Version](https://img.shields.io/badge/version-3.1.2-brightgreen?style=for-the-badge)
-
-[License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
-
-[Browser](https://img.shields.io/badge/browser-Chromium%20based-purple?style=for-the-badge)
-
-A sleek, minimalistic Chromium extension to organize and manage your browser tabs with a **glassmorphic**, bright purple-accented interface.
+A sleek, minimalistic Chromium extension to organize and manage your browser tabs with bright purple-accented interface.
 
 **Tabby keeps your browser tidy and your RAM happy!**
 
