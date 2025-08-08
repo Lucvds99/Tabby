@@ -1,0 +1,2998 @@
+manifest.json
+{
+  "manifest_version": 3,
+  "name": "Local Tab Group Manager",
+  "version": "2.0",
+  "description": "Organize your tabs into groups and manage them locally.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icon.png"
+  }
+}
+
+
+options.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tab Group Manager</title>
+  <style>
+    /* Container */
+    #main {
+      display: flex;
+      gap: 40px;
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+      min-height: 600px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f2f4f8;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+
+    /* Panels */
+    #open-tabs, #groups, #folders {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      transition: box-shadow 0.3s ease;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    #open-tabs:hover, #groups:hover, #folders:hover {
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      margin: 0 0 20px 0;
+      width: 100%;
+      color: #2c3e50;
+      user-select: none;
+    }
+
+    /* Lists */
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 5px 0 10px 0;
+      flex-grow: 1;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    ul li {
+      padding: 8px 12px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      flex-direction: column; /* stack vertically: header + dropdown */
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      user-select: none;
+      width: 100%;
+      box-sizing: border-box;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    ul li:hover {
+      background-color: #e6f0ff;
+    }
+
+    /* Header row inside each list item */
+    .header-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      justify-content: space-between; /* buttons to right, caret+name left */
+    }
+
+    /* Caret */
+    .caret {
+      cursor: pointer;
+      user-select: none;
+      margin-right: 8px;
+      font-size: 12px;
+      display: inline-block;
+      width: 14px;
+      flex-shrink: 0;
+      text-align: center;
+      transform: rotate(0deg);
+      transition: transform 0.2s ease;
+    }
+
+    /* Rotate caret when expanded */
+    li.expanded > .header-row > .caret {
+      transform: rotate(90deg);
+    }
+
+    /* Nested dropdown list */
+    ul.nested {
+      display: block;
+      margin-top: 6px;
+      margin-left: 20px;
+      width: 100%;
+      padding-left: 12px;
+      border-left: 2px solid #ddd;
+      box-sizing: border-box;
+      background: #fafafa;
+      overflow-x: hidden;
+      max-height: 200px;
+      overflow-y: auto;
+      border-radius: 6px;
+    }
+
+    /* Nested list items text truncated */
+    ul.nested li {
+      display: flex;
+      flex-direction: column; /* outer stacking */
+      padding: 8px 12px;
+    }
+
+    ul.nested li > .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      white-space: nowrap;
+    }
+
+    .name {
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+
+    /* Buttons */
+
+    button {
+      border: none;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+        #folders button, #groups button {
+      padding: 9px 10px;
+      margin-left: 10px;
+      cursor: pointer;
+      background-color: #2ecc71;
+      border: none;
+      color: white;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+
+    button.open-btn {
+      background-color: #27ae60;
+      color: white;
+    }
+    button.open-btn:hover {
+      background-color: #219150;
+    }
+
+    button.remove-btn {
+      background-color: #f39c12 !important;
+      color: white;
+    }
+    button.remove-btn:hover {
+      background-color: #d88f10 !important;
+    }
+
+    button.delete-btn, button.delete-group-btn {
+      background-color: #e74c3c !important;
+      color: white;
+    }
+    button.delete-btn:hover, button.delete-group-btn:hover {
+      background-color: #c0392b !important;
+    }
+
+    /* Input and buttons for creating group and folder */
+    #folders input, #groups input {
+      padding: 8px;
+      width: calc(100% - 110px);
+      margin-top: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      transition: box-shadow 0.3s ease;
+    }
+
+
+
+
+    /* Scrollbar styling */
+    ul::-webkit-scrollbar {
+      width: 8px;
+    }
+    ul::-webkit-scrollbar-thumb {
+      background-color: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+
+    /* Fade in animation */
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tab Group Manager</h1>
+  <div id="main">
+
+    <div id="open-tabs">
+      <h2>Open Tabs</h2>
+      <ul id="tab-list" class="dropzone"></ul>
+    </div>
+
+    <div id="groups">
+      <h2>Groups</h2>
+      <ul id="group-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-group-name" type="text" placeholder="New group name" />
+        <button id="create-group">+ Create Group</button>
+      </div>
+    </div>
+
+    <div id="folders">
+      <h2>Folders</h2>
+      <ul id="folder-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-folder-name" type="text" placeholder="New folder name" />
+        <button id="create-folder">+ Create Folder</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
+
+options.js
+document.addEventListener('DOMContentLoaded', () => {
+
+  const tabList = document.getElementById('tab-list');
+
+  const groupList = document.getElementById('group-list');
+  const newGroupInput = document.getElementById('new-group-name');
+  const createGroupBtn = document.getElementById('create-group');
+
+  const folderList = document.getElementById('folder-list');
+  const newFolderInput = document.getElementById('new-folder-name');
+  const createFolderBtn = document.getElementById('create-folder');
+
+  // State storage: folders and groups
+  let storageData = {
+    folders: {},  // folderName -> array of groupNames
+    groups: {}    // groupName -> array of tab objects {title, url}
+  };
+
+  // Track expanded groups in Groups panel separately from groups inside folders
+  const expandedGroups = new Set();
+  const expandedFolderGroups = new Map(); // Map folderName => Set of expanded groupNames
+  const expandedFolders = new Set();
+
+  // --- Utilities ---
+
+  function getExpandedFolderGroups(folderName) {
+    if (!expandedFolderGroups.has(folderName)) {
+      expandedFolderGroups.set(folderName, new Set());
+    }
+    return expandedFolderGroups.get(folderName);
+  }
+
+  // Save storage data
+  function saveStorage() {
+    chrome.storage.local.set(storageData);
+  }
+
+  // Load and migrate old format if necessary
+  function migrateOldData(oldData) {
+    let changed = false;
+
+    if (!('folders' in oldData) && !('groups' in oldData)) {
+      // Old format: flat groups only, tabs as string URLs
+      const groups = {};
+      for (const key in oldData) {
+        if (Array.isArray(oldData[key])) {
+          // Migrate tabs to objects with title=url for existing data
+          groups[key] = oldData[key].map(url => ({ title: url, url }));
+        }
+      }
+      storageData.groups = groups;
+      storageData.folders = {};
+      changed = true;
+      chrome.storage.local.set(storageData);
+    } else {
+      // Migrate any groups with tabs as strings to tabs as objects
+      storageData.folders = oldData.folders || {};
+      storageData.groups = oldData.groups || {};
+      for (const groupName in storageData.groups) {
+        const tabs = storageData.groups[groupName];
+        if (tabs.length > 0 && typeof tabs[0] === 'string') {
+          storageData.groups[groupName] = tabs.map(url => ({ title: url, url }));
+          changed = true;
+        }
+      }
+      if (changed) {
+        chrome.storage.local.set(storageData);
+      }
+    }
+    return changed;
+  }
+
+  // --- Render functions ---
+
+  // Render open tabs panel
+  function renderOpenTabs() {
+    tabList.innerHTML = '';
+    chrome.tabs.query({ currentWindow: true }, tabs => {
+      tabs.forEach(tab => {
+        const li = document.createElement('li');
+        li.textContent = tab.title || tab.url;
+        li.setAttribute('draggable', 'true');
+
+        const tabObj = { title: tab.title || tab.url, url: tab.url };
+        li.dataset.tab = JSON.stringify(tabObj);
+
+        li.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('application/json', li.dataset.tab);
+        });
+        tabList.appendChild(li);
+      });
+    });
+  }
+
+  // Render all groups in Groups panel (all, no folder filtering)
+  function renderGroups() {
+    groupList.innerHTML = '';
+
+    Object.keys(storageData.groups).sort().forEach(groupName => {
+      const li = createGroupListItemForGroupsPanel(groupName, storageData.groups[groupName]);
+      groupList.appendChild(li);
+    });
+  }
+
+  // Group item for Groups panel
+  function createGroupListItemForGroupsPanel(groupName, tabs) {
+    const li = document.createElement('li');
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('header-row');
+
+    // Caret for expand/collapse
+    const caret = document.createElement('span');
+    caret.textContent = '▶';
+    caret.className = 'caret';
+    if (expandedGroups.has(groupName)) {
+      caret.textContent = '▼';
+      li.classList.add('expanded');
+    }
+    caret.style.userSelect = 'none';
+    caret.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedGroups.has(groupName)) {
+        expandedGroups.delete(groupName);
+      } else {
+        expandedGroups.add(groupName);
+      }
+      renderGroups();
+    });
+    headerRow.appendChild(caret);
+
+    // Group name label
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = groupName;
+    nameSpan.classList.add('name');
+    nameSpan.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedGroups.has(groupName)) {
+        expandedGroups.delete(groupName);
+      } else {
+        expandedGroups.add(groupName);
+      }
+      renderGroups();
+    });
+    headerRow.appendChild(nameSpan);
+
+    // Buttons container
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.classList.add('buttons');
+
+    // Open button
+    const openBtn = document.createElement('button');
+    openBtn.className = 'open-btn';
+    openBtn.textContent = 'Open';
+    openBtn.title = `Open all tabs in group "${groupName}"`;
+    openBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
+    });
+    buttonsDiv.appendChild(openBtn);
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'delete-group-btn delete-btn';
+    deleteBtn.title = `Delete group "${groupName}"`;
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteGroup(groupName);
+    });
+    buttonsDiv.appendChild(deleteBtn);
+
+    headerRow.appendChild(buttonsDiv);
+
+    // Make group draggable (to folders)
+    headerRow.setAttribute('draggable', 'true');
+    headerRow.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', groupName);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    li.appendChild(headerRow);
+
+    // Dropdown list of tabs (if expanded)
+    if (expandedGroups.has(groupName)) {
+      const tabUL = document.createElement('ul');
+      tabUL.className = 'nested';
+
+      tabs.forEach((tab, index) => {
+        const tabLI = document.createElement('li');
+
+        // Flex container for tab title and buttons
+        const tabRow = document.createElement('div');
+        tabRow.classList.add('header-row');
+
+        // Title span
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = tab.title || tab.url || 'Untitled';
+        titleSpan.classList.add('name');
+        tabRow.appendChild(titleSpan);
+
+        // Buttons container
+        const buttonsDivTab = document.createElement('div');
+        buttonsDivTab.classList.add('buttons');
+
+        // Open tab button
+        const openTabBtn = document.createElement('button');
+        openTabBtn.textContent = 'Open';
+        openTabBtn.classList.add('open-btn');
+        openTabBtn.title = 'Open tab';
+        openTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          chrome.tabs.create({ url: tab.url });
+        });
+        buttonsDivTab.appendChild(openTabBtn);
+
+        // Delete tab button
+        const deleteTabBtn = document.createElement('button');
+        deleteTabBtn.textContent = 'Delete';
+        deleteTabBtn.classList.add('delete-btn');
+        deleteTabBtn.title = 'Remove tab from group';
+        deleteTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const idx = storageData.groups[groupName].findIndex(t => t.url === tab.url);
+          if (idx !== -1) {
+            storageData.groups[groupName].splice(idx, 1);
+            saveStorage();
+            renderGroups();
+          }
+        });
+        buttonsDivTab.appendChild(deleteTabBtn);
+
+        tabRow.appendChild(buttonsDivTab);
+        tabLI.appendChild(tabRow);
+
+        tabUL.appendChild(tabLI);
+      });
+
+      li.appendChild(tabUL);
+    }
+
+    // Accept drag of tabs into group to add tab objects
+    li.addEventListener('dragover', e => e.preventDefault());
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      let tabObj;
+      try {
+        tabObj = JSON.parse(e.dataTransfer.getData('application/json'));
+      } catch {
+        return;
+      }
+      if (tabObj && tabObj.url && !tabs.some(t => t.url === tabObj.url)) {
+        storageData.groups[groupName].push(tabObj);
+        saveStorage();
+        renderGroups();
+      }
+    });
+
+    return li;
+  }
+
+  // Render folders panel
+  function renderFolders() {
+    folderList.innerHTML = '';
+
+    Object.keys(storageData.folders).sort().forEach(folderName => {
+      const li = createFolderListItem(folderName, storageData.folders[folderName]);
+      folderList.appendChild(li);
+    });
+  }
+
+  // Create folder list item: expandable folder with groups inside
+  function createFolderListItem(folderName, groupNames) {
+    const li = document.createElement('li');
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('header-row');
+
+    // Caret for expand/collapse of folder
+    const caret = document.createElement('span');
+    caret.textContent = '▶';
+    caret.className = 'caret';
+    if (expandedFolders.has(folderName)) {
+      caret.textContent = '▼';
+      li.classList.add('expanded');
+    }
+    caret.style.userSelect = 'none';
+    caret.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedFolders.has(folderName)) {
+        expandedFolders.delete(folderName);
+      } else {
+        expandedFolders.add(folderName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(caret);
+
+    // Folder name label
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = folderName;
+    nameSpan.classList.add('name');
+    nameSpan.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedFolders.has(folderName)) {
+        expandedFolders.delete(folderName);
+      } else {
+        expandedFolders.add(folderName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(nameSpan);
+
+    // Buttons container for folder
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.classList.add('buttons');
+
+    // Open button: opens all tabs in all groups in folder
+    const openBtn = document.createElement('button');
+    openBtn.className = 'open-btn';
+    openBtn.textContent = 'Open';
+    openBtn.title = `Open all tabs in folder "${folderName}"`;
+    openBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      groupNames.forEach(gName => {
+        const tabs = storageData.groups[gName];
+        if (tabs) tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
+      });
+    });
+    buttonsDiv.appendChild(openBtn);
+
+    // Delete button (deletes folder, not groups)
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'delete-group-btn delete-btn';
+    deleteBtn.title = `Delete folder "${folderName}"`;
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteFolder(folderName);
+    });
+    buttonsDiv.appendChild(deleteBtn);
+
+    headerRow.appendChild(buttonsDiv);
+    li.appendChild(headerRow);
+
+    // Dropdown listing groups in folder with their own dropdowns
+    if (expandedFolders.has(folderName)) {
+      const groupsUL = document.createElement('ul');
+      groupsUL.className = 'nested';
+
+      groupNames.slice().sort().forEach(groupName => {
+        const tabs = storageData.groups[groupName];
+        if (!tabs) return;
+
+        const groupLI = createGroupListItemForFolderPanel(folderName, groupName, tabs);
+        groupsUL.appendChild(groupLI);
+      });
+
+      li.appendChild(groupsUL);
+    }
+
+    // Drag and drop: folder accepts dragged groups
+    li.addEventListener('dragover', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '#d0e7ff';
+    });
+    li.addEventListener('dragleave', e => {
+      li.style.backgroundColor = '';
+    });
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '';
+      const groupName = e.dataTransfer.getData('text/plain');
+      if (groupName && storageData.groups[groupName]) {
+        moveGroupToFolder(groupName, folderName);
+      }
+    });
+
+    return li;
+  }
+
+  // Group item rendering inside a folder panel with independent dropdown expand state and Remove button
+  function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
+    const li = document.createElement('li');
+
+    const expandedSet = getExpandedFolderGroups(folderName);
+    const isExpanded = expandedSet.has(groupName);
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('header-row');
+
+    // Caret
+    const caret = document.createElement('span');
+    caret.textContent = '▶';
+    caret.className = 'caret';
+    if (isExpanded) {
+      caret.textContent = '▼';
+      li.classList.add('expanded');
+    }
+    caret.style.userSelect = 'none';
+    caret.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedSet.has(groupName)) {
+        expandedSet.delete(groupName);
+      } else {
+        expandedSet.add(groupName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(caret);
+
+    // Group name label
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = groupName;
+    nameSpan.classList.add('name');
+    nameSpan.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedSet.has(groupName)) {
+        expandedSet.delete(groupName);
+      } else {
+        expandedSet.add(groupName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(nameSpan);
+
+    // Buttons container
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.classList.add('buttons');
+
+    // Open button
+    const openBtn = document.createElement('button');
+    openBtn.textContent = 'Open';
+    openBtn.classList.add('open-btn');
+    openBtn.title = `Open all tabs in group "${groupName}"`;
+    openBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
+    });
+    buttonsDiv.appendChild(openBtn);
+
+    // Remove button: remove group from folder
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.className = 'remove-btn';
+    removeBtn.title = `Remove group from folder "${folderName}"`;
+    removeBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      removeGroupFromFolder(groupName, folderName);
+    });
+    buttonsDiv.appendChild(removeBtn);
+
+    // Delete button (deletes group fully)
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'delete-group-btn delete-btn';
+    deleteBtn.title = `Delete group "${groupName}" completely`;
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteGroup(groupName);
+    });
+    buttonsDiv.appendChild(deleteBtn);
+
+    headerRow.appendChild(buttonsDiv);
+    li.appendChild(headerRow);
+
+    // Dropdown tabs list if expanded
+    if (isExpanded) {
+      const tabUL = document.createElement('ul');
+      tabUL.className = 'nested';
+      tabs.forEach((tab, index) => {
+        const tabLI = document.createElement('li');
+
+        // Flex container for tab title and buttons
+        const tabRow = document.createElement('div');
+        tabRow.classList.add('header-row');
+
+        // Title span
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = tab.title || tab.url || 'Untitled';
+        titleSpan.classList.add('name');
+        tabRow.appendChild(titleSpan);
+
+        // Buttons container
+        const buttonsDivTab = document.createElement('div');
+        buttonsDivTab.classList.add('buttons');
+
+        // Open tab button
+        const openTabBtn = document.createElement('button');
+        openTabBtn.textContent = 'Open';
+        openTabBtn.classList.add('open-btn');
+        openTabBtn.title = 'Open tab';
+        openTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          chrome.tabs.create({ url: tab.url });
+        });
+        buttonsDivTab.appendChild(openTabBtn);
+
+        // Delete tab button
+        const deleteTabBtn = document.createElement('button');
+        deleteTabBtn.textContent = 'Delete';
+        deleteTabBtn.classList.add('delete-btn');
+        deleteTabBtn.title = 'Remove tab from group';
+        deleteTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const groupTabs = storageData.groups[groupName];
+          const idx = groupTabs.findIndex(t => t.url === tab.url);
+          if (idx !== -1) {
+            groupTabs.splice(idx, 1);
+            saveStorage();
+            renderFolders();
+          }
+        });
+        buttonsDivTab.appendChild(deleteTabBtn);
+
+        tabRow.appendChild(buttonsDivTab);
+        tabLI.appendChild(tabRow);
+
+        tabUL.appendChild(tabLI);
+      });
+      li.appendChild(tabUL);
+    }
+
+    return li;
+  }
+
+  // --- Actions ---
+
+  function deleteGroup(groupName) {
+    if (!confirm(`Delete group "${groupName}" and all its tabs? This action cannot be undone.`)) return;
+    delete storageData.groups[groupName];
+    Object.keys(storageData.folders).forEach(folder => {
+      storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
+    });
+    saveStorage();
+    expandedGroups.delete(groupName);
+    expandedFolderGroups.forEach(set => set.delete(groupName));
+    renderGroups();
+    renderFolders();
+  }
+
+  function deleteFolder(folderName) {
+    if (!confirm(`Delete folder "${folderName}"? Groups inside will become unassigned.`)) return;
+    delete storageData.folders[folderName];
+    saveStorage();
+    expandedFolders.delete(folderName);
+    expandedFolderGroups.delete(folderName);
+    renderFolders();
+  }
+
+  function removeGroupFromFolder(groupName, folderName) {
+    if (!storageData.folders[folderName]) return;
+    storageData.folders[folderName] = storageData.folders[folderName].filter(g => g !== groupName);
+    saveStorage();
+    const expandedSet = getExpandedFolderGroups(folderName);
+    expandedSet.delete(groupName);
+    renderFolders();
+  }
+
+  function createGroup(name) {
+    if (!name) {
+      alert('Please enter a group name');
+      return;
+    }
+    if (storageData.groups[name]) {
+      alert('Group already exists');
+      return;
+    }
+    storageData.groups[name] = [];
+    saveStorage();
+    renderGroups();
+  }
+
+  function createFolder(name) {
+    if (!name) {
+      alert('Please enter a folder name');
+      return;
+    }
+    if (storageData.folders[name]) {
+      alert('Folder already exists');
+      return;
+    }
+    storageData.folders[name] = [];
+    saveStorage();
+    renderFolders();
+  }
+
+  function moveGroupToFolder(groupName, folderName) {
+    Object.keys(storageData.folders).forEach(folder => {
+      storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
+    });
+    if (!storageData.folders[folderName]) storageData.folders[folderName] = [];
+    if (!storageData.folders[folderName].includes(groupName)) {
+      storageData.folders[folderName].push(groupName);
+    }
+    saveStorage();
+    renderFolders();
+    renderGroups();
+  }
+
+  // --- Event listeners ---
+
+  createGroupBtn.addEventListener('click', () => {
+    createGroup(newGroupInput.value.trim());
+    newGroupInput.value = '';
+  });
+
+  createFolderBtn.addEventListener('click', () => {
+    createFolder(newFolderInput.value.trim());
+    newFolderInput.value = '';
+  });
+
+  // --- Initialization ---
+
+  chrome.storage.local.get(null, data => {
+    if (migrateOldData(data)) {
+      setTimeout(() => chrome.storage.local.get(null, newData => {
+        storageData = newData;
+        renderOpenTabs();
+        renderGroups();
+        renderFolders();
+      }), 100);
+    } else {
+      storageData = {
+        groups: data.groups || {},
+        folders: data.folders || {}
+      };
+      renderOpenTabs();
+      renderGroups();
+      renderFolders();
+    }
+  });
+});
+
+popup.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tab Group Manager</title>
+  <style>
+    body {
+      width: 400px;
+      min-height: 220px;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #29313a;
+      background: #f7fafd;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .popup-main {
+      padding: 18px 20px 16px 20px;
+    }
+    h1 {
+      margin: 0 0 14px 0;
+      font-size: 1.3em;
+      font-weight: 700;
+      color: #247ba0;
+      letter-spacing: 1px;
+      text-shadow: 0 1px 0 #fff;
+    }
+    .section {
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 1.09em;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #34495e;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      border-radius: 7px;
+      background: #f8f9fa;
+      border: 1px solid #e2e7ef;
+      box-shadow: 0 1px 7px rgba(36,123,160,0.04);
+      font-size: 15px;
+    }
+    li {
+      display: flex;
+      align-items: center;
+      padding: 7px 0 7px 8px;
+      border-bottom: 1px solid #e2e7ef;
+      min-height: 35px;
+      transition: background 0.12s;
+    }
+    li:last-child {
+      border-bottom: none;
+    }
+    .item-name {
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+      color: #247ba0;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    button {
+      background: linear-gradient(90deg, #27ae60 80%, #40bad5 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 6px 13px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(36,123,160,0.09);
+      transition: background 0.12s;
+      outline: none;
+    }
+    button:disabled {
+      background: #b9c2cc;
+      color: #ececec;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button:hover:not(:disabled) {
+      background: linear-gradient(90deg, #24b285 70%, #247ba0 100%);
+    }
+    /* Save group row */
+    #save-row {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    #group-name {
+      flex: 1;
+      font-size: 15px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1.6px solid #d1d9e6;
+      margin-right: 0;
+      background: #f8fafc;
+      box-shadow: 0 2px 6px rgba(36,123,160,0.05);
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+    #group-name:focus {
+      border-color: #247ba0;
+      outline: none;
+      background: #fff;
+      box-shadow: 0 0 0 2px #a2d8f4;
+    }
+    #save-group {
+      background-color: #2ecc71;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 0.97em;
+      font-weight: 600;
+      transition: background 0.14s;
+    }
+    #save-group:hover {
+      background-color: #27ae60;
+    }
+    #open-manager-link {
+      display: block;
+      text-align: right;
+      font-size: 13px;
+      margin-top: 16px;
+      margin-bottom: 0;
+      color: #247ba0;
+      text-decoration: underline;
+      font-weight: 500;
+    }
+    #open-manager-link:hover {
+      color: #15516a;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-main">
+    <h1>Tab Groups</h1>
+    <div id="save-row">
+      <input id="group-name" type="text" placeholder="New group name" autocomplete="off">
+      <button id="save-group">Save</button>
+    </div>
+    <div class="section">
+      <div class="section-title">Folders</div>
+      <ul id="folder-list"></ul>
+    </div>
+    <div class="section">
+      <div class="section-title">Groups</div>
+      <ul id="group-list"></ul>
+    </div>
+    <a href="options.html" target="_blank" id="open-manager-link">Open Tab Manager…</a>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
+
+popup.js
+document.addEventListener('DOMContentLoaded', () => {
+  const groupNameInput = document.getElementById('group-name');
+  const saveBtn = document.getElementById('save-group');
+  const folderList = document.getElementById('folder-list');
+  const groupList = document.getElementById('group-list');
+
+  let storageData = { groups: {}, folders: {} };
+
+  function renderFolders() {
+    folderList.innerHTML = '';
+    Object.keys(storageData.folders).sort().forEach(folderName => {
+      const li = document.createElement('li');
+
+      // Folder name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'item-name';
+      nameSpan.textContent = folderName;
+      li.appendChild(nameSpan);
+
+      // Buttons
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'buttons';
+
+      // Open button
+      const openBtn = document.createElement('button');
+      openBtn.className = 'open-btn';
+      openBtn.textContent = 'Open';
+      openBtn.title = `Open all tabs in folder "${folderName}"`;
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const groupsInFolder = storageData.folders[folderName] || [];
+        groupsInFolder.forEach(gName => {
+          const tabs = storageData.groups[gName];
+          if (tabs && tabs.length)
+            tabs.forEach(tabObj => chrome.tabs.create({ url: tabObj.url }));
+        });
+      });
+
+      buttonsDiv.appendChild(openBtn);
+      li.appendChild(buttonsDiv);
+      folderList.appendChild(li);
+    });
+  }
+
+  function renderGroups() {
+    groupList.innerHTML = '';
+    Object.keys(storageData.groups).sort().forEach(groupName => {
+      const li = document.createElement('li');
+
+      // Group name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'item-name';
+      nameSpan.textContent = groupName;
+      li.appendChild(nameSpan);
+
+      // Buttons
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'buttons';
+
+      // Open button
+      const openBtn = document.createElement('button');
+      openBtn.className = 'open-btn';
+      openBtn.textContent = 'Open';
+      openBtn.title = `Open all tabs in group "${groupName}"`;
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tabs = storageData.groups[groupName];
+        if (tabs && tabs.length)
+          tabs.forEach(tabObj => chrome.tabs.create({ url: tabObj.url }));
+      });
+      buttonsDiv.appendChild(openBtn);
+
+      li.appendChild(buttonsDiv);
+      groupList.appendChild(li);
+    });
+  }
+
+  function loadAndRender() {
+    chrome.storage.local.get(null, data => {
+      storageData.groups = data.groups || {};
+      storageData.folders = data.folders || {};
+      renderFolders();
+      renderGroups();
+    });
+  }
+
+  saveBtn.addEventListener('click', () => {
+    const name = groupNameInput.value.trim();
+    if (!name) return;
+    chrome.tabs.query({ currentWindow: true }, tabs => {
+      const tabObjs = tabs.map(tab => ({
+        title: tab.title || tab.url,
+        url: tab.url
+      }));
+      chrome.storage.local.get(null, (data) => {
+        const allGroups = data.groups || {};
+        allGroups[name] = tabObjs;
+        chrome.storage.local.set({ groups: allGroups }, loadAndRender);
+        groupNameInput.value = '';
+      });
+    });
+  });
+
+  loadAndRender();
+});
+
+style.css
+/* Basic Styles */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f2f4f8;
+  color: #333;
+  margin: 0;
+  padding: 20px;
+  overflow-x: hidden;
+}
+
+/* Headers */
+h1, h2, h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  transition: color 0.3s ease;
+}
+
+h1:hover, h2:hover, h3:hover {
+  color: #3498db;
+}
+
+/* Main Section */
+#main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  opacity: 0;
+  animation: fadeIn 1s forwards;
+}
+
+/* Containers */
+#open-tabs, #groups {
+  flex: 1 1 45%;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+#open-tabs:hover, #groups:hover {
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* List Styles */
+ul, .group {
+  list-style: none;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  min-height: 100px;
+  background: #fafafa;
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+  opacity: 0;
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+/* Tab List Items */
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #ffffff;
+  margin: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: grab;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.3s ease;
+}
+
+li:hover {
+  background-color: #e6f0ff;
+  transform: scale(1.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Group Container Styling */
+.group {
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Buttons */
+button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  margin-left: 10px;
+}
+
+button:hover {
+  background-color: #2980b9;
+  transform: scale(1.05);
+}
+
+/* Group Creation Button */
+#create-group {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  background-color: #2ecc71;
+  transition: background-color 0.3s ease;
+}
+
+#create-group:hover {
+  background-color: #27ae60;
+}
+
+/* Delete Group Button */
+.delete-group-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.delete-group-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Delete Tab Button */
+.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.delete-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Smooth Input Styles */
+input[type="text"] {
+  padding: 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  width: calc(100% - 20px);
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  transition: box-shadow 0.3s ease;
+}
+
+input[type="text"]:focus {
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.8);
+  outline: none;
+}
+
+/* Fade In and Slide In Animations */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* List items full width and flex row */
+ul li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  white-space: nowrap; /* prevent wrapping */
+  overflow: hidden;
+}
+
+/* The caret and name container, left side */
+ul li > div, /* general header containers */
+ul li > span.caret,
+ul li > span.name {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Name span: truncate with ellipsis */
+ul li > span.name {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+}
+
+/* Buttons container (right side) - keep buttons together */
+ul li > div.buttons {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Buttons styles */
+
+button {
+  border: none;
+  color: white;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Specific button colors */
+
+button.open-btn {
+  background-color: #27ae60; /* green */
+}
+button.open-btn:hover {
+  background-color: #219150;
+}
+
+button.remove-btn {
+  background-color: #f39c12; /* orange/yellow */
+}
+button.remove-btn:hover {
+  background-color: #d88f10;
+}
+
+button.delete-btn, button.delete-group-btn {
+  background-color: #e74c3c; /* red */
+}
+button.delete-btn:hover, button.delete-group-btn:hover {
+  background-color: #c0392b;
+}
+
+/* Caret style */
+span.caret {
+  font-size: 12px;
+  user-select: none;
+  cursor: pointer;
+  width: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+  text-align: center;
+}
+
+/* Nested dropdown ul width matches parent li (the header) */
+ul.nested {
+  max-width: 100%;
+  width: 100%;
+  margin-left: 22px; /* indent from parent */
+  padding-left: 0;
+  box-sizing: border-box;
+  overflow-x: hidden; /* cut off overflow, no horizontal scroll */
+}
+
+/* Nested li truncate text also */
+ul.nested li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* On hover background consistent */
+ul li:hover {
+  background-color: #e6f0ff;
+  /* no zoom scaling to keep layout stable */
+}
+
+
+
+copy.txt
+manifest.json
+{
+  "manifest_version": 3,
+  "name": "Local Tab Group Manager",
+  "version": "2.0",
+  "description": "Organize your tabs into groups and manage them locally.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icon.png"
+  }
+}
+
+
+options.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tab Group Manager</title>
+  <style>
+    /* Container */
+    #main {
+      display: flex;
+      gap: 40px;
+      opacity: 0;
+      animation: fadeIn 1s forwards;
+      min-height: 600px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f2f4f8;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+
+    /* Panels */
+    #open-tabs, #groups, #folders {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      transition: box-shadow 0.3s ease;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    #open-tabs:hover, #groups:hover, #folders:hover {
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      margin: 0 0 20px 0;
+      width: 100%;
+      color: #2c3e50;
+      user-select: none;
+    }
+
+    /* Lists */
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 5px 0 10px 0;
+      flex-grow: 1;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    ul li {
+      padding: 8px 12px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      flex-direction: column; /* stack vertically: header + dropdown */
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      user-select: none;
+      width: 100%;
+      box-sizing: border-box;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    ul li:hover {
+      background-color: #e6f0ff;
+    }
+
+    /* Header row inside each list item */
+    .header-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      justify-content: space-between; /* buttons to right, caret+name left */
+    }
+
+    /* Caret */
+    .caret {
+      cursor: pointer;
+      user-select: none;
+      margin-right: 8px;
+      font-size: 12px;
+      display: inline-block;
+      width: 14px;
+      flex-shrink: 0;
+      text-align: center;
+      transform: rotate(0deg);
+      transition: transform 0.2s ease;
+    }
+
+    /* Rotate caret when expanded */
+    li.expanded > .header-row > .caret {
+      transform: rotate(90deg);
+    }
+
+    /* Nested dropdown list */
+    ul.nested {
+      display: block;
+      margin-top: 6px;
+      margin-left: 20px;
+      width: 100%;
+      padding-left: 12px;
+      border-left: 2px solid #ddd;
+      box-sizing: border-box;
+      background: #fafafa;
+      overflow-x: hidden;
+      max-height: 200px;
+      overflow-y: auto;
+      border-radius: 6px;
+    }
+
+    /* Nested list items text truncated */
+    ul.nested li {
+      display: flex;
+      flex-direction: column; /* outer stacking */
+      padding: 8px 12px;
+    }
+
+    ul.nested li > .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      white-space: nowrap;
+    }
+
+    .name {
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+
+    /* Buttons */
+
+    button {
+      border: none;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+        #folders button, #groups button {
+      padding: 9px 10px;
+      margin-left: 10px;
+      cursor: pointer;
+      background-color: #2ecc71;
+      border: none;
+      color: white;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+
+    button.open-btn {
+      background-color: #27ae60;
+      color: white;
+    }
+    button.open-btn:hover {
+      background-color: #219150;
+    }
+
+    button.remove-btn {
+      background-color: #f39c12 !important;
+      color: white;
+    }
+    button.remove-btn:hover {
+      background-color: #d88f10 !important;
+    }
+
+    button.delete-btn, button.delete-group-btn {
+      background-color: #e74c3c !important;
+      color: white;
+    }
+    button.delete-btn:hover, button.delete-group-btn:hover {
+      background-color: #c0392b !important;
+    }
+
+    /* Input and buttons for creating group and folder */
+    #folders input, #groups input {
+      padding: 8px;
+      width: calc(100% - 110px);
+      margin-top: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      transition: box-shadow 0.3s ease;
+    }
+
+
+
+
+    /* Scrollbar styling */
+    ul::-webkit-scrollbar {
+      width: 8px;
+    }
+    ul::-webkit-scrollbar-thumb {
+      background-color: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+
+    /* Fade in animation */
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tab Group Manager</h1>
+  <div id="main">
+
+    <div id="open-tabs">
+      <h2>Open Tabs</h2>
+      <ul id="tab-list" class="dropzone"></ul>
+    </div>
+
+    <div id="groups">
+      <h2>Groups</h2>
+      <ul id="group-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-group-name" type="text" placeholder="New group name" />
+        <button id="create-group">+ Create Group</button>
+      </div>
+    </div>
+
+    <div id="folders">
+      <h2>Folders</h2>
+      <ul id="folder-list" class="dropzone"></ul>
+      <div style="display: flex;">
+        <input id="new-folder-name" type="text" placeholder="New folder name" />
+        <button id="create-folder">+ Create Folder</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
+
+options.js
+document.addEventListener('DOMContentLoaded', () => {
+
+  const tabList = document.getElementById('tab-list');
+
+  const groupList = document.getElementById('group-list');
+  const newGroupInput = document.getElementById('new-group-name');
+  const createGroupBtn = document.getElementById('create-group');
+
+  const folderList = document.getElementById('folder-list');
+  const newFolderInput = document.getElementById('new-folder-name');
+  const createFolderBtn = document.getElementById('create-folder');
+
+  // State storage: folders and groups
+  let storageData = {
+    folders: {},  // folderName -> array of groupNames
+    groups: {}    // groupName -> array of tab objects {title, url}
+  };
+
+  // Track expanded groups in Groups panel separately from groups inside folders
+  const expandedGroups = new Set();
+  const expandedFolderGroups = new Map(); // Map folderName => Set of expanded groupNames
+  const expandedFolders = new Set();
+
+  // --- Utilities ---
+
+  function getExpandedFolderGroups(folderName) {
+    if (!expandedFolderGroups.has(folderName)) {
+      expandedFolderGroups.set(folderName, new Set());
+    }
+    return expandedFolderGroups.get(folderName);
+  }
+
+  // Save storage data
+  function saveStorage() {
+    chrome.storage.local.set(storageData);
+  }
+
+  // Load and migrate old format if necessary
+  function migrateOldData(oldData) {
+    let changed = false;
+
+    if (!('folders' in oldData) && !('groups' in oldData)) {
+      // Old format: flat groups only, tabs as string URLs
+      const groups = {};
+      for (const key in oldData) {
+        if (Array.isArray(oldData[key])) {
+          // Migrate tabs to objects with title=url for existing data
+          groups[key] = oldData[key].map(url => ({ title: url, url }));
+        }
+      }
+      storageData.groups = groups;
+      storageData.folders = {};
+      changed = true;
+      chrome.storage.local.set(storageData);
+    } else {
+      // Migrate any groups with tabs as strings to tabs as objects
+      storageData.folders = oldData.folders || {};
+      storageData.groups = oldData.groups || {};
+      for (const groupName in storageData.groups) {
+        const tabs = storageData.groups[groupName];
+        if (tabs.length > 0 && typeof tabs[0] === 'string') {
+          storageData.groups[groupName] = tabs.map(url => ({ title: url, url }));
+          changed = true;
+        }
+      }
+      if (changed) {
+        chrome.storage.local.set(storageData);
+      }
+    }
+    return changed;
+  }
+
+  // --- Render functions ---
+
+  // Render open tabs panel
+  function renderOpenTabs() {
+    tabList.innerHTML = '';
+    chrome.tabs.query({ currentWindow: true }, tabs => {
+      tabs.forEach(tab => {
+        const li = document.createElement('li');
+        li.textContent = tab.title || tab.url;
+        li.setAttribute('draggable', 'true');
+
+        const tabObj = { title: tab.title || tab.url, url: tab.url };
+        li.dataset.tab = JSON.stringify(tabObj);
+
+        li.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('application/json', li.dataset.tab);
+        });
+        tabList.appendChild(li);
+      });
+    });
+  }
+
+  // Render all groups in Groups panel (all, no folder filtering)
+  function renderGroups() {
+    groupList.innerHTML = '';
+
+    Object.keys(storageData.groups).sort().forEach(groupName => {
+      const li = createGroupListItemForGroupsPanel(groupName, storageData.groups[groupName]);
+      groupList.appendChild(li);
+    });
+  }
+
+  // Group item for Groups panel
+  function createGroupListItemForGroupsPanel(groupName, tabs) {
+    const li = document.createElement('li');
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('header-row');
+
+    // Caret for expand/collapse
+    const caret = document.createElement('span');
+    caret.textContent = '▶';
+    caret.className = 'caret';
+    if (expandedGroups.has(groupName)) {
+      caret.textContent = '▼';
+      li.classList.add('expanded');
+    }
+    caret.style.userSelect = 'none';
+    caret.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedGroups.has(groupName)) {
+        expandedGroups.delete(groupName);
+      } else {
+        expandedGroups.add(groupName);
+      }
+      renderGroups();
+    });
+    headerRow.appendChild(caret);
+
+    // Group name label
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = groupName;
+    nameSpan.classList.add('name');
+    nameSpan.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedGroups.has(groupName)) {
+        expandedGroups.delete(groupName);
+      } else {
+        expandedGroups.add(groupName);
+      }
+      renderGroups();
+    });
+    headerRow.appendChild(nameSpan);
+
+    // Buttons container
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.classList.add('buttons');
+
+    // Open button
+    const openBtn = document.createElement('button');
+    openBtn.className = 'open-btn';
+    openBtn.textContent = 'Open';
+    openBtn.title = `Open all tabs in group "${groupName}"`;
+    openBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
+    });
+    buttonsDiv.appendChild(openBtn);
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'delete-group-btn delete-btn';
+    deleteBtn.title = `Delete group "${groupName}"`;
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteGroup(groupName);
+    });
+    buttonsDiv.appendChild(deleteBtn);
+
+    headerRow.appendChild(buttonsDiv);
+
+    // Make group draggable (to folders)
+    headerRow.setAttribute('draggable', 'true');
+    headerRow.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', groupName);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    li.appendChild(headerRow);
+
+    // Dropdown list of tabs (if expanded)
+    if (expandedGroups.has(groupName)) {
+      const tabUL = document.createElement('ul');
+      tabUL.className = 'nested';
+
+      tabs.forEach((tab, index) => {
+        const tabLI = document.createElement('li');
+
+        // Flex container for tab title and buttons
+        const tabRow = document.createElement('div');
+        tabRow.classList.add('header-row');
+
+        // Title span
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = tab.title || tab.url || 'Untitled';
+        titleSpan.classList.add('name');
+        tabRow.appendChild(titleSpan);
+
+        // Buttons container
+        const buttonsDivTab = document.createElement('div');
+        buttonsDivTab.classList.add('buttons');
+
+        // Open tab button
+        const openTabBtn = document.createElement('button');
+        openTabBtn.textContent = 'Open';
+        openTabBtn.classList.add('open-btn');
+        openTabBtn.title = 'Open tab';
+        openTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          chrome.tabs.create({ url: tab.url });
+        });
+        buttonsDivTab.appendChild(openTabBtn);
+
+        // Delete tab button
+        const deleteTabBtn = document.createElement('button');
+        deleteTabBtn.textContent = 'Delete';
+        deleteTabBtn.classList.add('delete-btn');
+        deleteTabBtn.title = 'Remove tab from group';
+        deleteTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const idx = storageData.groups[groupName].findIndex(t => t.url === tab.url);
+          if (idx !== -1) {
+            storageData.groups[groupName].splice(idx, 1);
+            saveStorage();
+            renderGroups();
+          }
+        });
+        buttonsDivTab.appendChild(deleteTabBtn);
+
+        tabRow.appendChild(buttonsDivTab);
+        tabLI.appendChild(tabRow);
+
+        tabUL.appendChild(tabLI);
+      });
+
+      li.appendChild(tabUL);
+    }
+
+    // Accept drag of tabs into group to add tab objects
+    li.addEventListener('dragover', e => e.preventDefault());
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      let tabObj;
+      try {
+        tabObj = JSON.parse(e.dataTransfer.getData('application/json'));
+      } catch {
+        return;
+      }
+      if (tabObj && tabObj.url && !tabs.some(t => t.url === tabObj.url)) {
+        storageData.groups[groupName].push(tabObj);
+        saveStorage();
+        renderGroups();
+      }
+    });
+
+    return li;
+  }
+
+  // Render folders panel
+  function renderFolders() {
+    folderList.innerHTML = '';
+
+    Object.keys(storageData.folders).sort().forEach(folderName => {
+      const li = createFolderListItem(folderName, storageData.folders[folderName]);
+      folderList.appendChild(li);
+    });
+  }
+
+  // Create folder list item: expandable folder with groups inside
+  function createFolderListItem(folderName, groupNames) {
+    const li = document.createElement('li');
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('header-row');
+
+    // Caret for expand/collapse of folder
+    const caret = document.createElement('span');
+    caret.textContent = '▶';
+    caret.className = 'caret';
+    if (expandedFolders.has(folderName)) {
+      caret.textContent = '▼';
+      li.classList.add('expanded');
+    }
+    caret.style.userSelect = 'none';
+    caret.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedFolders.has(folderName)) {
+        expandedFolders.delete(folderName);
+      } else {
+        expandedFolders.add(folderName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(caret);
+
+    // Folder name label
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = folderName;
+    nameSpan.classList.add('name');
+    nameSpan.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedFolders.has(folderName)) {
+        expandedFolders.delete(folderName);
+      } else {
+        expandedFolders.add(folderName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(nameSpan);
+
+    // Buttons container for folder
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.classList.add('buttons');
+
+    // Open button: opens all tabs in all groups in folder
+    const openBtn = document.createElement('button');
+    openBtn.className = 'open-btn';
+    openBtn.textContent = 'Open';
+    openBtn.title = `Open all tabs in folder "${folderName}"`;
+    openBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      groupNames.forEach(gName => {
+        const tabs = storageData.groups[gName];
+        if (tabs) tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
+      });
+    });
+    buttonsDiv.appendChild(openBtn);
+
+    // Delete button (deletes folder, not groups)
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'delete-group-btn delete-btn';
+    deleteBtn.title = `Delete folder "${folderName}"`;
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteFolder(folderName);
+    });
+    buttonsDiv.appendChild(deleteBtn);
+
+    headerRow.appendChild(buttonsDiv);
+    li.appendChild(headerRow);
+
+    // Dropdown listing groups in folder with their own dropdowns
+    if (expandedFolders.has(folderName)) {
+      const groupsUL = document.createElement('ul');
+      groupsUL.className = 'nested';
+
+      groupNames.slice().sort().forEach(groupName => {
+        const tabs = storageData.groups[groupName];
+        if (!tabs) return;
+
+        const groupLI = createGroupListItemForFolderPanel(folderName, groupName, tabs);
+        groupsUL.appendChild(groupLI);
+      });
+
+      li.appendChild(groupsUL);
+    }
+
+    // Drag and drop: folder accepts dragged groups
+    li.addEventListener('dragover', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '#d0e7ff';
+    });
+    li.addEventListener('dragleave', e => {
+      li.style.backgroundColor = '';
+    });
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      li.style.backgroundColor = '';
+      const groupName = e.dataTransfer.getData('text/plain');
+      if (groupName && storageData.groups[groupName]) {
+        moveGroupToFolder(groupName, folderName);
+      }
+    });
+
+    return li;
+  }
+
+  // Group item rendering inside a folder panel with independent dropdown expand state and Remove button
+  function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
+    const li = document.createElement('li');
+
+    const expandedSet = getExpandedFolderGroups(folderName);
+    const isExpanded = expandedSet.has(groupName);
+
+    // Header row
+    const headerRow = document.createElement('div');
+    headerRow.classList.add('header-row');
+
+    // Caret
+    const caret = document.createElement('span');
+    caret.textContent = '▶';
+    caret.className = 'caret';
+    if (isExpanded) {
+      caret.textContent = '▼';
+      li.classList.add('expanded');
+    }
+    caret.style.userSelect = 'none';
+    caret.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedSet.has(groupName)) {
+        expandedSet.delete(groupName);
+      } else {
+        expandedSet.add(groupName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(caret);
+
+    // Group name label
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = groupName;
+    nameSpan.classList.add('name');
+    nameSpan.addEventListener('click', e => {
+      e.stopPropagation();
+      if (expandedSet.has(groupName)) {
+        expandedSet.delete(groupName);
+      } else {
+        expandedSet.add(groupName);
+      }
+      renderFolders();
+    });
+    headerRow.appendChild(nameSpan);
+
+    // Buttons container
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.classList.add('buttons');
+
+    // Open button
+    const openBtn = document.createElement('button');
+    openBtn.textContent = 'Open';
+    openBtn.classList.add('open-btn');
+    openBtn.title = `Open all tabs in group "${groupName}"`;
+    openBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
+    });
+    buttonsDiv.appendChild(openBtn);
+
+    // Remove button: remove group from folder
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.className = 'remove-btn';
+    removeBtn.title = `Remove group from folder "${folderName}"`;
+    removeBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      removeGroupFromFolder(groupName, folderName);
+    });
+    buttonsDiv.appendChild(removeBtn);
+
+    // Delete button (deletes group fully)
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'delete-group-btn delete-btn';
+    deleteBtn.title = `Delete group "${groupName}" completely`;
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteGroup(groupName);
+    });
+    buttonsDiv.appendChild(deleteBtn);
+
+    headerRow.appendChild(buttonsDiv);
+    li.appendChild(headerRow);
+
+    // Dropdown tabs list if expanded
+    if (isExpanded) {
+      const tabUL = document.createElement('ul');
+      tabUL.className = 'nested';
+      tabs.forEach((tab, index) => {
+        const tabLI = document.createElement('li');
+
+        // Flex container for tab title and buttons
+        const tabRow = document.createElement('div');
+        tabRow.classList.add('header-row');
+
+        // Title span
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = tab.title || tab.url || 'Untitled';
+        titleSpan.classList.add('name');
+        tabRow.appendChild(titleSpan);
+
+        // Buttons container
+        const buttonsDivTab = document.createElement('div');
+        buttonsDivTab.classList.add('buttons');
+
+        // Open tab button
+        const openTabBtn = document.createElement('button');
+        openTabBtn.textContent = 'Open';
+        openTabBtn.classList.add('open-btn');
+        openTabBtn.title = 'Open tab';
+        openTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          chrome.tabs.create({ url: tab.url });
+        });
+        buttonsDivTab.appendChild(openTabBtn);
+
+        // Delete tab button
+        const deleteTabBtn = document.createElement('button');
+        deleteTabBtn.textContent = 'Delete';
+        deleteTabBtn.classList.add('delete-btn');
+        deleteTabBtn.title = 'Remove tab from group';
+        deleteTabBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const groupTabs = storageData.groups[groupName];
+          const idx = groupTabs.findIndex(t => t.url === tab.url);
+          if (idx !== -1) {
+            groupTabs.splice(idx, 1);
+            saveStorage();
+            renderFolders();
+          }
+        });
+        buttonsDivTab.appendChild(deleteTabBtn);
+
+        tabRow.appendChild(buttonsDivTab);
+        tabLI.appendChild(tabRow);
+
+        tabUL.appendChild(tabLI);
+      });
+      li.appendChild(tabUL);
+    }
+
+    return li;
+  }
+
+  // --- Actions ---
+
+  function deleteGroup(groupName) {
+    if (!confirm(`Delete group "${groupName}" and all its tabs? This action cannot be undone.`)) return;
+    delete storageData.groups[groupName];
+    Object.keys(storageData.folders).forEach(folder => {
+      storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
+    });
+    saveStorage();
+    expandedGroups.delete(groupName);
+    expandedFolderGroups.forEach(set => set.delete(groupName));
+    renderGroups();
+    renderFolders();
+  }
+
+  function deleteFolder(folderName) {
+    if (!confirm(`Delete folder "${folderName}"? Groups inside will become unassigned.`)) return;
+    delete storageData.folders[folderName];
+    saveStorage();
+    expandedFolders.delete(folderName);
+    expandedFolderGroups.delete(folderName);
+    renderFolders();
+  }
+
+  function removeGroupFromFolder(groupName, folderName) {
+    if (!storageData.folders[folderName]) return;
+    storageData.folders[folderName] = storageData.folders[folderName].filter(g => g !== groupName);
+    saveStorage();
+    const expandedSet = getExpandedFolderGroups(folderName);
+    expandedSet.delete(groupName);
+    renderFolders();
+  }
+
+  function createGroup(name) {
+    if (!name) {
+      alert('Please enter a group name');
+      return;
+    }
+    if (storageData.groups[name]) {
+      alert('Group already exists');
+      return;
+    }
+    storageData.groups[name] = [];
+    saveStorage();
+    renderGroups();
+  }
+
+  function createFolder(name) {
+    if (!name) {
+      alert('Please enter a folder name');
+      return;
+    }
+    if (storageData.folders[name]) {
+      alert('Folder already exists');
+      return;
+    }
+    storageData.folders[name] = [];
+    saveStorage();
+    renderFolders();
+  }
+
+  function moveGroupToFolder(groupName, folderName) {
+    Object.keys(storageData.folders).forEach(folder => {
+      storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
+    });
+    if (!storageData.folders[folderName]) storageData.folders[folderName] = [];
+    if (!storageData.folders[folderName].includes(groupName)) {
+      storageData.folders[folderName].push(groupName);
+    }
+    saveStorage();
+    renderFolders();
+    renderGroups();
+  }
+
+  // --- Event listeners ---
+
+  createGroupBtn.addEventListener('click', () => {
+    createGroup(newGroupInput.value.trim());
+    newGroupInput.value = '';
+  });
+
+  createFolderBtn.addEventListener('click', () => {
+    createFolder(newFolderInput.value.trim());
+    newFolderInput.value = '';
+  });
+
+  // --- Initialization ---
+
+  chrome.storage.local.get(null, data => {
+    if (migrateOldData(data)) {
+      setTimeout(() => chrome.storage.local.get(null, newData => {
+        storageData = newData;
+        renderOpenTabs();
+        renderGroups();
+        renderFolders();
+      }), 100);
+    } else {
+      storageData = {
+        groups: data.groups || {},
+        folders: data.folders || {}
+      };
+      renderOpenTabs();
+      renderGroups();
+      renderFolders();
+    }
+  });
+});
+
+popup.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tab Group Manager</title>
+  <style>
+    body {
+      width: 400px;
+      min-height: 220px;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #29313a;
+      background: #f7fafd;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .popup-main {
+      padding: 18px 20px 16px 20px;
+    }
+    h1 {
+      margin: 0 0 14px 0;
+      font-size: 1.3em;
+      font-weight: 700;
+      color: #247ba0;
+      letter-spacing: 1px;
+      text-shadow: 0 1px 0 #fff;
+    }
+    .section {
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 1.09em;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #34495e;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      border-radius: 7px;
+      background: #f8f9fa;
+      border: 1px solid #e2e7ef;
+      box-shadow: 0 1px 7px rgba(36,123,160,0.04);
+      font-size: 15px;
+    }
+    li {
+      display: flex;
+      align-items: center;
+      padding: 7px 0 7px 8px;
+      border-bottom: 1px solid #e2e7ef;
+      min-height: 35px;
+      transition: background 0.12s;
+    }
+    li:last-child {
+      border-bottom: none;
+    }
+    .item-name {
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+      color: #247ba0;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    button {
+      background: linear-gradient(90deg, #27ae60 80%, #40bad5 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 6px 13px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(36,123,160,0.09);
+      transition: background 0.12s;
+      outline: none;
+    }
+    button:disabled {
+      background: #b9c2cc;
+      color: #ececec;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button:hover:not(:disabled) {
+      background: linear-gradient(90deg, #24b285 70%, #247ba0 100%);
+    }
+    /* Save group row */
+    #save-row {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    #group-name {
+      flex: 1;
+      font-size: 15px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1.6px solid #d1d9e6;
+      margin-right: 0;
+      background: #f8fafc;
+      box-shadow: 0 2px 6px rgba(36,123,160,0.05);
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+    #group-name:focus {
+      border-color: #247ba0;
+      outline: none;
+      background: #fff;
+      box-shadow: 0 0 0 2px #a2d8f4;
+    }
+    #save-group {
+      background-color: #2ecc71;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 0.97em;
+      font-weight: 600;
+      transition: background 0.14s;
+    }
+    #save-group:hover {
+      background-color: #27ae60;
+    }
+    #open-manager-link {
+      display: block;
+      text-align: right;
+      font-size: 13px;
+      margin-top: 16px;
+      margin-bottom: 0;
+      color: #247ba0;
+      text-decoration: underline;
+      font-weight: 500;
+    }
+    #open-manager-link:hover {
+      color: #15516a;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-main">
+    <h1>Tab Groups</h1>
+    <div id="save-row">
+      <input id="group-name" type="text" placeholder="New group name" autocomplete="off">
+      <button id="save-group">Save</button>
+    </div>
+    <div class="section">
+      <div class="section-title">Folders</div>
+      <ul id="folder-list"></ul>
+    </div>
+    <div class="section">
+      <div class="section-title">Groups</div>
+      <ul id="group-list"></ul>
+    </div>
+    <a href="options.html" target="_blank" id="open-manager-link">Open Tab Manager…</a>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
+
+popup.js
+document.addEventListener('DOMContentLoaded', () => {
+  const groupNameInput = document.getElementById('group-name');
+  const saveBtn = document.getElementById('save-group');
+  const folderList = document.getElementById('folder-list');
+  const groupList = document.getElementById('group-list');
+
+  let storageData = { groups: {}, folders: {} };
+
+  function renderFolders() {
+    folderList.innerHTML = '';
+    Object.keys(storageData.folders).sort().forEach(folderName => {
+      const li = document.createElement('li');
+
+      // Folder name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'item-name';
+      nameSpan.textContent = folderName;
+      li.appendChild(nameSpan);
+
+      // Buttons
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'buttons';
+
+      // Open button
+      const openBtn = document.createElement('button');
+      openBtn.className = 'open-btn';
+      openBtn.textContent = 'Open';
+      openBtn.title = `Open all tabs in folder "${folderName}"`;
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const groupsInFolder = storageData.folders[folderName] || [];
+        groupsInFolder.forEach(gName => {
+          const tabs = storageData.groups[gName];
+          if (tabs && tabs.length)
+            tabs.forEach(tabObj => chrome.tabs.create({ url: tabObj.url }));
+        });
+      });
+
+      buttonsDiv.appendChild(openBtn);
+      li.appendChild(buttonsDiv);
+      folderList.appendChild(li);
+    });
+  }
+
+  function renderGroups() {
+    groupList.innerHTML = '';
+    Object.keys(storageData.groups).sort().forEach(groupName => {
+      const li = document.createElement('li');
+
+      // Group name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'item-name';
+      nameSpan.textContent = groupName;
+      li.appendChild(nameSpan);
+
+      // Buttons
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'buttons';
+
+      // Open button
+      const openBtn = document.createElement('button');
+      openBtn.className = 'open-btn';
+      openBtn.textContent = 'Open';
+      openBtn.title = `Open all tabs in group "${groupName}"`;
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tabs = storageData.groups[groupName];
+        if (tabs && tabs.length)
+          tabs.forEach(tabObj => chrome.tabs.create({ url: tabObj.url }));
+      });
+      buttonsDiv.appendChild(openBtn);
+
+      li.appendChild(buttonsDiv);
+      groupList.appendChild(li);
+    });
+  }
+
+  function loadAndRender() {
+    chrome.storage.local.get(null, data => {
+      storageData.groups = data.groups || {};
+      storageData.folders = data.folders || {};
+      renderFolders();
+      renderGroups();
+    });
+  }
+
+  saveBtn.addEventListener('click', () => {
+    const name = groupNameInput.value.trim();
+    if (!name) return;
+    chrome.tabs.query({ currentWindow: true }, tabs => {
+      const tabObjs = tabs.map(tab => ({
+        title: tab.title || tab.url,
+        url: tab.url
+      }));
+      chrome.storage.local.get(null, (data) => {
+        const allGroups = data.groups || {};
+        allGroups[name] = tabObjs;
+        chrome.storage.local.set({ groups: allGroups }, loadAndRender);
+        groupNameInput.value = '';
+      });
+    });
+  });
+
+  loadAndRender();
+});
+
+style.css
+/* Basic Styles */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f2f4f8;
+  color: #333;
+  margin: 0;
+  padding: 20px;
+  overflow-x: hidden;
+}
+
+/* Headers */
+h1, h2, h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  transition: color 0.3s ease;
+}
+
+h1:hover, h2:hover, h3:hover {
+  color: #3498db;
+}
+
+/* Main Section */
+#main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  opacity: 0;
+  animation: fadeIn 1s forwards;
+}
+
+/* Containers */
+#open-tabs, #groups {
+  flex: 1 1 45%;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+#open-tabs:hover, #groups:hover {
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* List Styles */
+ul, .group {
+  list-style: none;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  min-height: 100px;
+  background: #fafafa;
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+  opacity: 0;
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+/* Tab List Items */
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #ffffff;
+  margin: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: grab;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.3s ease;
+}
+
+li:hover {
+  background-color: #e6f0ff;
+  transform: scale(1.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Group Container Styling */
+.group {
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Buttons */
+button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  margin-left: 10px;
+}
+
+button:hover {
+  background-color: #2980b9;
+  transform: scale(1.05);
+}
+
+/* Group Creation Button */
+#create-group {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  background-color: #2ecc71;
+  transition: background-color 0.3s ease;
+}
+
+#create-group:hover {
+  background-color: #27ae60;
+}
+
+/* Delete Group Button */
+.delete-group-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.delete-group-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Delete Tab Button */
+.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.delete-btn:hover {
+  background-color: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Smooth Input Styles */
+input[type="text"] {
+  padding: 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  width: calc(100% - 20px);
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  transition: box-shadow 0.3s ease;
+}
+
+input[type="text"]:focus {
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.8);
+  outline: none;
+}
+
+/* Fade In and Slide In Animations */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* List items full width and flex row */
+ul li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  white-space: nowrap; /* prevent wrapping */
+  overflow: hidden;
+}
+
+/* The caret and name container, left side */
+ul li > div, /* general header containers */
+ul li > span.caret,
+ul li > span.name {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Name span: truncate with ellipsis */
+ul li > span.name {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+}
+
+/* Buttons container (right side) - keep buttons together */
+ul li > div.buttons {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Buttons styles */
+
+button {
+  border: none;
+  color: white;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Specific button colors */
+
+button.open-btn {
+  background-color: #27ae60; /* green */
+}
+button.open-btn:hover {
+  background-color: #219150;
+}
+
+button.remove-btn {
+  background-color: #f39c12; /* orange/yellow */
+}
+button.remove-btn:hover {
+  background-color: #d88f10;
+}
+
+button.delete-btn, button.delete-group-btn {
+  background-color: #e74c3c; /* red */
+}
+button.delete-btn:hover, button.delete-group-btn:hover {
+  background-color: #c0392b;
+}
+
+/* Caret style */
+span.caret {
+  font-size: 12px;
+  user-select: none;
+  cursor: pointer;
+  width: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+  text-align: center;
+}
+
+/* Nested dropdown ul width matches parent li (the header) */
+ul.nested {
+  max-width: 100%;
+  width: 100%;
+  margin-left: 22px; /* indent from parent */
+  padding-left: 0;
+  box-sizing: border-box;
+  overflow-x: hidden; /* cut off overflow, no horizontal scroll */
+}
+
+/* Nested li truncate text also */
+ul.nested li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* On hover background consistent */
+ul li:hover {
+  background-color: #e6f0ff;
+  /* no zoom scaling to keep layout stable */
+}
+
+
+
+copy.txt
+manifest.json
+{
+  "manifest_version": 3,
+  "name": "Local Tab Group Manager",
+  "version": "2.0",
+  "description": "Organize your tabs into groups and manage them locally.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+  
