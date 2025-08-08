@@ -2,12 +2,14 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Tab Group Manager</title>
+  <title>Tabby</title>
   <link rel="stylesheet" href="style/popup.css">
 </head>
 <body>
   <div class="popup-main">
-    <h1>Tab Groups</h1>
+    <div id="header">
+      <img src="icon.png" alt="Logo"> 
+    </div>
     <div id="save-row">
       <input id="group-name" type="text" placeholder="New group name" autocomplete="off">
       <button id="save-group">Save</button>
@@ -20,7 +22,7 @@
       <div class="section-title">Groups</div>
       <ul id="group-list"></ul>
     </div>
-    <a href="options.html" target="_blank" id="open-manager-link">Open Tab Manager…</a>
+    <a href="options.html" target="_blank" id="open-manager-link">Open Tabby…</a>
   </div>
 
   <script src="popup.js"></script>
