@@ -1,4 +1,7 @@
-![Alt text for accessibility](Tabby/icon.png)
+<p align="center">
+  <img src="images/diagram.png" alt="Diagram" width="300">
+</p>
+
 
 # Tabby
 
