@@ -1,3 +1,5 @@
+![Alt text for accessibility](Tabby/Tabby/icon.png)
+
 # Tabby
 
 **Version 3.1.2**
