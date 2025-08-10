@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/diagram.png" alt="Diagram" width="300">
+  <img src="Tabby/icon.png" alt="Diagram" width="300">
 </p>
 
 
