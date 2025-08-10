@@ -1,4 +1,4 @@
-![Alt text for accessibility](Tabby/Tabby/icon.png)
+![Alt text for accessibility](Tabby/icon.png)
 
 # Tabby
 
