@@ -1,3 +1,10 @@
+/**
+ * @module popup
+ * Handles popup UI and saving current tabs as group.
+ */
+
+import { loadStorage } from '../background/storage.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const groupNameInput = document.getElementById('group-name');
   const saveBtn = document.getElementById('save-group');
@@ -11,17 +18,14 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(storageData.folders).sort().forEach(folderName => {
       const li = document.createElement('li');
 
-      // Folder name
       const nameSpan = document.createElement('span');
       nameSpan.className = 'item-name';
       nameSpan.textContent = folderName;
       li.appendChild(nameSpan);
 
-      // Buttons
       const buttonsDiv = document.createElement('div');
       buttonsDiv.className = 'buttons';
 
-      // Open button
       const openBtn = document.createElement('button');
       openBtn.className = 'open-btn';
       openBtn.textContent = 'Open';
@@ -31,8 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const groupsInFolder = storageData.folders[folderName] || [];
         groupsInFolder.forEach(gName => {
           const tabs = storageData.groups[gName];
-          if (tabs && tabs.length)
+          if (tabs && tabs.length) {
             tabs.forEach(tabObj => chrome.tabs.create({ url: tabObj.url }));
+          }
         });
       });
 
@@ -47,17 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(storageData.groups).sort().forEach(groupName => {
       const li = document.createElement('li');
 
-      // Group name
       const nameSpan = document.createElement('span');
       nameSpan.className = 'item-name';
       nameSpan.textContent = groupName;
       li.appendChild(nameSpan);
 
-      // Buttons
       const buttonsDiv = document.createElement('div');
       buttonsDiv.className = 'buttons';
 
-      // Open button
       const openBtn = document.createElement('button');
       openBtn.className = 'open-btn';
       openBtn.textContent = 'Open';
@@ -65,11 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
       openBtn.addEventListener('click', e => {
         e.stopPropagation();
         const tabs = storageData.groups[groupName];
-        if (tabs && tabs.length)
+        if (tabs && tabs.length) {
           tabs.forEach(tabObj => chrome.tabs.create({ url: tabObj.url }));
+        }
       });
-      buttonsDiv.appendChild(openBtn);
 
+      buttonsDiv.appendChild(openBtn);
       li.appendChild(buttonsDiv);
       groupList.appendChild(li);
     });
