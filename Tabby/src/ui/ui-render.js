@@ -345,7 +345,9 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
     e.stopPropagation();
     if (expandedSet.has(groupName)) expandedSet.delete(groupName);
     else expandedSet.add(groupName);
-    renderFolders(li.parentElement || document.createElement('ul'));
+    const folderList = document.getElementById('folder-list');
+    renderFolders(folderList);
+
   });
   headerRow.appendChild(caret);
 
@@ -356,7 +358,8 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
     e.stopPropagation();
     if (expandedSet.has(groupName)) expandedSet.delete(groupName);
     else expandedSet.add(groupName);
-    renderFolders(li.parentElement || document.createElement('ul'));
+    const folderList = document.getElementById('folder-list');
+    renderFolders(folderList);
   });
   headerRow.appendChild(nameSpan);
 
