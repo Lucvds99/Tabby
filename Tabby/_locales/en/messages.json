@@ -1,0 +1,65 @@
+{
+  "enterGroupName": {
+    "message": "Please enter a group name",
+    "description": "Alert shown when group name is empty"
+  },
+  "groupExists": {
+    "message": "Group already exists",
+    "description": "Alert shown when group name already exists"
+  },
+  "enterFolderName": {
+    "message": "Please enter a folder name",
+    "description": "Alert shown when folder name is empty"
+  },
+  "folderExists": {
+    "message": "Folder already exists",
+    "description": "Alert shown when folder name already exists"
+  },
+  "deleteGroupConfirm": {
+    "message": "Delete group \"{groupName}\" and all its tabs? This cannot be undone.",
+    "description": "Confirmation message when deleting a group"
+  },
+  "deleteFolderConfirm": {
+    "message": "Delete folder \"{folderName}\"? Groups inside will become unassigned.",
+    "description": "Confirmation message when deleting a folder"
+  },
+  "openButtonText": {
+    "message": "Open",
+    "description": "Button text to open all tabs"
+  },
+  "openAllTabsTitle": {
+    "message": "Open all tabs in {0}",
+    "description": "Tooltip to open all tabs in a group or folder"
+  },
+  "openAllTabsGroupTitle": { "message": "Open all tabs in group \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "openAllTabsFolderTitle": { "message": "Open all tabs in folder \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "deleteButtonText": { "message": "Delete" },
+  "deleteGroupTitle": { "message": "Delete group \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "deleteFolderTitle": { "message": "Delete folder \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "deleteGroupCompletelyTitle": { "message": "Delete group \"$1\" completely", "placeholders": { "1": { "content": "$1" } } },
+  "removeButtonText": { "message": "Remove" },
+  "removeGroupFromFolderTitle": { "message": "Remove group from folder \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "removeTabFromGroupTitle": { "message": "Remove tab from group" },
+  "untitledTabText": { "message": "Untitled" },
+  "openTabTitle": { "message": "Open tab" },
+
+  "optionsTitle": { "message": "Tabby Options" },
+  "mainTitle": { "message": "Tabby" },
+  "openTabsHeader": { "message": "Open Tabs" },
+  "groupsHeader": { "message": "Groups" },
+  "foldersHeader": { "message": "Folders" },
+  "newGroupPlaceholder": { "message": "New group name" },
+  "createGroupButton": { "message": "+ Create Group" },
+  "newFolderPlaceholder": { "message": "New folder name" },
+  "createFolderButton": { "message": "+ Create Folder" },
+  "footerTitle": { "message": "Tabby - Double v3.2.1" },
+  "footerDesc": { "message": "A tab organizing tool to keep your browser organized and your RAM happy" },
+  "footerCredit": { "message": "art made by Lyna" },
+
+  
+  "popupTitle": { "message": "Tabby" },
+  "saveGroupButton": { "message": "Save" },
+  "openManagerLink": { "message": "Open Tabby…" }
+
+
+}

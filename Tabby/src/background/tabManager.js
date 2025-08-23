@@ -11,11 +11,11 @@ import { storageData, saveStorage } from './storage.js';
  */
 export function createGroup(name) {
   if (!name) {
-    alert('Please enter a group name');
+    alert(chrome.i18n.getMessage('enterGroupName'));
     return;
   }
   if (storageData.groups[name]) {
-    alert('Group already exists');
+    alert(chrome.i18n.getMessage('groupExists'));
     return;
   }
   storageData.groups[name] = [];
@@ -28,11 +28,11 @@ export function createGroup(name) {
  */
 export function createFolder(name) {
   if (!name) {
-    alert('Please enter a folder name');
+    alert(chrome.i18n.getMessage('enterFolderName'));
     return;
   }
   if (storageData.folders[name]) {
-    alert('Folder already exists');
+    alert(chrome.i18n.getMessage('folderExists'));
     return;
   }
   storageData.folders[name] = [];
@@ -44,7 +44,7 @@ export function createFolder(name) {
  * @param {string} groupName 
  */
 export function deleteGroup(groupName) {
-  if (!confirm(`Delete group "${groupName}" and all its tabs? This cannot be undone.`)) return;
+  if (!confirm(chrome.i18n.getMessage('deleteGroupConfirm', [groupName]))) return;
   delete storageData.groups[groupName];
   Object.keys(storageData.folders).forEach(folder => {
     storageData.folders[folder] = storageData.folders[folder].filter(g => g !== groupName);
@@ -57,7 +57,7 @@ export function deleteGroup(groupName) {
  * @param {string} folderName 
  */
 export function deleteFolder(folderName) {
-  if (!confirm(`Delete folder "${folderName}"? Groups inside will become unassigned.`)) return;
+  if (!confirm(chrome.i18n.getMessage('deleteFolderConfirm', [folderName]))) return;
   delete storageData.folders[folderName];
   saveStorage();
 }

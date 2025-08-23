@@ -1,46 +1,47 @@
-<!DOCTYPE html> <html>
+<!DOCTYPE html>
+<html>
 <head>
   <meta charset="utf-8" />
-  <title>Tabby option</title>
+  <title data-i18n="optionsTitle">Tabby option</title>
   <link rel="stylesheet" href="style/options.css">
 </head>
 <body>
   <div id="header">
-    <h1>Tabby</h1>
-    <img src="icon.png" alt="Logo" />  
+    <h1 data-i18n="mainTitle">Tabby</h1>
+    <img src="icon.png" alt="Logo" />
   </div>
   
   <div id="main">
 
     <div id="open-tabs">
-      <h2>Open Tabs</h2>
+      <h2 data-i18n="openTabsHeader">Open Tabs</h2>
       <ul id="tab-list" class="dropzone"></ul>
     </div>
 
     <div id="groups">
-      <h2>Groups</h2>
+      <h2 data-i18n="groupsHeader">Groups</h2>
       <ul id="group-list" class="dropzone"></ul>
       <div style="display: flex;">
-        <input id="new-group-name" type="text" placeholder="New group name" />
-        <button id="create-group">+ Create Group</button>
+        <input id="new-group-name" type="text" data-i18n-placeholder="newGroupPlaceholder" placeholder="New group name" />
+        <button id="create-group" data-i18n="createGroupButton">+ Create Group</button>
       </div>
     </div>
 
     <div id="folders">
-      <h2>Folders</h2>
+      <h2 data-i18n="foldersHeader">Folders</h2>
       <ul id="folder-list" class="dropzone"></ul>
       <div style="display: flex;">
-        <input id="new-folder-name" type="text" placeholder="New folder name" />
-        <button id="create-folder">+ Create Folder</button>
+        <input id="new-folder-name" type="text" data-i18n-placeholder="newFolderPlaceholder" placeholder="New folder name" />
+        <button id="create-folder" data-i18n="createFolderButton">+ Create Folder</button>
       </div>
     </div>
 
   </div>
 
   <div id="footer">
-    <h3>Tabby - Double v3.2.1</h3>
-    <h3>A tab orginizing tool to keep ur browser orginized and ur ram happy</h3>
-    <h5>art made by Lyna</h5>
+    <h3 data-i18n="footerTitle">Tabby - Double v3.2.1</h3>
+    <h3 data-i18n="footerDesc">A tab orginizing tool to keep ur browser orginized and ur ram happy</h3>
+    <h5 data-i18n="footerCredit">art made by Lyna</h5>
   </div>
 
   <script type="module" src="src/ui/options.js"></script>

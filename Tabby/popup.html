@@ -2,27 +2,27 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Tabby</title>
+  <title data-i18n="popupTitle">Tabby</title>
   <link rel="stylesheet" href="style/popup.css">
 </head>
 <body>
   <div class="popup-main">
     <div id="header">
-      <img src="icon.png" alt="Logo"> 
+      <img src="icon.png" alt="Logo">
     </div>
     <div id="save-row">
-      <input id="group-name" type="text" placeholder="New group name" autocomplete="off">
-      <button id="save-group">Save</button>
+      <input id="group-name" type="text" autocomplete="off" data-i18n-placeholder="newGroupPlaceholder" placeholder="New group name">
+      <button id="save-group" data-i18n="saveGroupButton">Save</button>
     </div>
     <div class="section">
-      <div class="section-title">Folders</div>
+      <div class="section-title" data-i18n="foldersHeader">Folders</div>
       <ul id="folder-list"></ul>
     </div>
     <div class="section">
-      <div class="section-title">Groups</div>
+      <div class="section-title" data-i18n="groupsHeader">Groups</div>
       <ul id="group-list"></ul>
     </div>
-    <a href="options.html" target="_blank" id="open-manager-link">Open Tabby…</a>
+    <a href="options.html" target="_blank" id="open-manager-link" data-i18n="openManagerLink">Open Tabby…</a>
   </div>
 
   <script type="module" src="src/ui/popup.js"></script>

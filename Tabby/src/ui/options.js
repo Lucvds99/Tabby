@@ -8,6 +8,15 @@ import { createGroup, createFolder } from '/src/background/tabManager.js';
 import { renderOpenTabs, renderGroups, renderFolders } from '/src/ui/ui-render.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-i18n]').forEach(elem => {
+    const msg = chrome.i18n.getMessage(elem.dataset.i18n);
+    if (msg) elem.textContent = msg;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(elem => {
+    const msg = chrome.i18n.getMessage(elem.dataset.i18nPlaceholder);
+    if (msg) elem.placeholder = msg;
+  });
+  
   const tabList = document.getElementById('tab-list');
   const groupList = document.getElementById('group-list');
   const folderList = document.getElementById('folder-list');

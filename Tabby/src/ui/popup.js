@@ -6,6 +6,15 @@
 import { loadStorage } from '../background/storage.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  
+  document.querySelectorAll('[data-i18n]').forEach(elem => {
+    const msg = chrome.i18n.getMessage(elem.dataset.i18n);
+    if (msg) elem.textContent = msg;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(elem => {
+    const msg = chrome.i18n.getMessage(elem.dataset.i18nPlaceholder);
+    if (msg) elem.placeholder = msg;
+  });
   const groupNameInput = document.getElementById('group-name');
   const saveBtn = document.getElementById('save-group');
   const folderList = document.getElementById('folder-list');
@@ -28,8 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const openBtn = document.createElement('button');
       openBtn.className = 'open-btn';
-      openBtn.textContent = 'Open';
-      openBtn.title = `Open all tabs in folder "${folderName}"`;
+      openBtn.textContent = chrome.i18n.getMessage('openButtonText');
+      openBtn.title = chrome.i18n.getMessage('openAllTabsTitle', [folderName]);
       openBtn.addEventListener('click', e => {
         e.stopPropagation();
         const groupsInFolder = storageData.folders[folderName] || [];
@@ -62,8 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const openBtn = document.createElement('button');
       openBtn.className = 'open-btn';
-      openBtn.textContent = 'Open';
-      openBtn.title = `Open all tabs in group "${groupName}"`;
+      openBtn.textContent = chrome.i18n.getMessage('openButtonText');
+      openBtn.title = chrome.i18n.getMessage('openAllTabsTitle', [groupName]);
       openBtn.addEventListener('click', e => {
         e.stopPropagation();
         const tabs = storageData.groups[groupName];

@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Tabby",
   "version": "3.2.1",
+  "default_locale": "en",
   "description": "Organize your tabs into groups and manage them locally.",
   "permissions": ["tabs", "storage"],
   "host_permissions": ["<all_urls>"],

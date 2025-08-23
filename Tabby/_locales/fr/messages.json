@@ -1,0 +1,63 @@
+{
+  "enterGroupName": {
+    "message": "Veuillez entrer un nom de groupe",
+    "description": "Alerte affichée quand le nom du groupe est vide"
+  },
+  "groupExists": {
+    "message": "Le groupe existe déjà",
+    "description": "Alerte affichée quand le nom du groupe existe déjà"
+  },
+  "enterFolderName": {
+    "message": "Veuillez entrer un nom de dossier",
+    "description": "Alerte affichée quand le nom du dossier est vide"
+  },
+  "folderExists": {
+    "message": "Le dossier existe déjà",
+    "description": "Alerte affichée quand le nom du dossier existe déjà"
+  },
+  "deleteGroupConfirm": {
+    "message": "Supprimer le groupe \"{groupName}\" et tous ses onglets ? Cette action est irréversible.",
+    "description": "Message de confirmation lors de la suppression d’un groupe"
+  },
+  "deleteFolderConfirm": {
+    "message": "Supprimer le dossier \"{folderName}\" ? Les groupes à l’intérieur seront désassignés.",
+    "description": "Message de confirmation lors de la suppression d’un dossier"
+  },
+  "openButtonText": {
+    "message": "Ouvrir",
+    "description": "Texte du bouton pour ouvrir tous les onglets"
+  },
+  "openAllTabsTitle": {
+    "message": "Ouvrir tous les onglets dans {0}",
+    "description": "Info-bulle pour ouvrir tous les onglets dans un groupe ou un dossier"
+  },
+  "openAllTabsGroupTitle": { "message": "Ouvrir tous les onglets du groupe \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "openAllTabsFolderTitle": { "message": "Ouvrir tous les onglets du dossier \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "deleteButtonText": { "message": "Supprimer" },
+  "deleteGroupTitle": { "message": "Supprimer le groupe \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "deleteFolderTitle": { "message": "Supprimer le dossier \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "deleteGroupCompletelyTitle": { "message": "Supprimer complètement le groupe \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "removeButtonText": { "message": "Retirer" },
+  "removeGroupFromFolderTitle": { "message": "Retirer le groupe du dossier \"$1\"", "placeholders": { "1": { "content": "$1" } } },
+  "removeTabFromGroupTitle": { "message": "Retirer l'onglet du groupe" },
+  "untitledTabText": { "message": "Sans titre" },
+  "openTabTitle": { "message": "Ouvrir l'onglet" },
+
+  "optionsTitle": { "message": "Options Tabby" },
+  "mainTitle": { "message": "Tabby" },
+  "openTabsHeader": { "message": "Onglets ouverts" },
+  "groupsHeader": { "message": "Groupes" },
+  "foldersHeader": { "message": "Dossiers" },
+  "newGroupPlaceholder": { "message": "Nouveau nom de groupe" },
+  "createGroupButton": { "message": "+ Créer un groupe" },
+  "newFolderPlaceholder": { "message": "Nouveau nom de dossier" },
+  "createFolderButton": { "message": "+ Créer un dossier" },
+  "footerTitle": { "message": "Tabby - Double v3.2.1" },
+  "footerDesc": { "message": "Un outil pour organiser les onglets et préserver la mémoire vive" },
+  "footerCredit": { "message": "art réalisé par Lyna" },
+
+  
+  "popupTitle": { "message": "Tabby" },
+  "saveGroupButton": { "message": "Sauvegarder" },
+  "openManagerLink": { "message": "Ouvrir Tabby…" }
+}

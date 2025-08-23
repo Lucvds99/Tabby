@@ -106,8 +106,8 @@ function createGroupListItemForGroupsPanel(groupName, tabs) {
   // Open group button (open all tabs)
   const openBtn = document.createElement('button');
   openBtn.className = 'open-btn';
-  openBtn.textContent = 'Open';
-  openBtn.title = `Open all tabs in group "${groupName}"`;
+  openBtn.textContent = chrome.i18n.getMessage('openButtonText');
+  openBtn.title = chrome.i18n.getMessage('openAllTabsGroupTitle', [groupName]);
   openBtn.addEventListener('click', e => {
     e.stopPropagation();
     tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
@@ -117,8 +117,8 @@ function createGroupListItemForGroupsPanel(groupName, tabs) {
   // Delete group button
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete-group-btn delete-btn';
-  deleteBtn.textContent = 'Delete';
-  deleteBtn.title = `Delete group "${groupName}"`;
+  deleteBtn.textContent = chrome.i18n.getMessage('deleteButtonText');
+  deleteBtn.title = chrome.i18n.getMessage('deleteGroupTitle', [groupName]);
   deleteBtn.addEventListener('click', e => {
     e.stopPropagation();
     deleteGroup(groupName);
@@ -150,7 +150,7 @@ function createGroupListItemForGroupsPanel(groupName, tabs) {
       tabRow.classList.add('header-row');
 
       const titleSpan = document.createElement('span');
-      titleSpan.textContent = tab.title || tab.url || 'Untitled';
+      titleSpan.textContent = tab.title || tab.url || chrome.i18n.getMessage('untitledTabText');
       titleSpan.classList.add('name');
       tabRow.appendChild(titleSpan);
 
@@ -160,9 +160,9 @@ function createGroupListItemForGroupsPanel(groupName, tabs) {
 
       // Open tab button
       const openTabBtn = document.createElement('button');
-      openTabBtn.textContent = 'Open';
+      openTabBtn.textContent = chrome.i18n.getMessage('openButtonText');
       openTabBtn.classList.add('open-btn');
-      openTabBtn.title = 'Open tab';
+      openTabBtn.title = chrome.i18n.getMessage('openTabTitle');
       openTabBtn.addEventListener('click', e => {
         e.stopPropagation();
         chrome.tabs.create({ url: tab.url });
@@ -171,9 +171,9 @@ function createGroupListItemForGroupsPanel(groupName, tabs) {
 
       // Delete tab button
       const deleteTabBtn = document.createElement('button');
-      deleteTabBtn.textContent = 'Delete';
+      deleteTabBtn.textContent = chrome.i18n.getMessage('deleteButtonText');
       deleteTabBtn.classList.add('delete-btn');
-      deleteTabBtn.title = 'Remove tab from group';
+      deleteTabBtn.title = chrome.i18n.getMessage('removeTabFromGroupTitle');
       deleteTabBtn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = storageData.groups[groupName].findIndex(t => t.url === tab.url);
@@ -257,8 +257,8 @@ function createFolderListItem(folderName, groupNames) {
   // Open folder button: open tabs of all groups inside folder
   const openBtn = document.createElement('button');
   openBtn.classList.add('open-btn');
-  openBtn.textContent = 'Open';
-  openBtn.title = `Open all tabs in folder "${folderName}"`;
+  openBtn.textContent = chrome.i18n.getMessage('openButtonText');
+  openBtn.title = chrome.i18n.getMessage('openAllTabsFolderTitle', [folderName]);
   openBtn.addEventListener('click', e => {
     e.stopPropagation();
     groupNames.forEach(gName => {
@@ -270,9 +270,9 @@ function createFolderListItem(folderName, groupNames) {
 
   // Delete folder button
   const deleteBtn = document.createElement('button');
-  deleteBtn.textContent = 'Delete';
+  deleteBtn.textContent = chrome.i18n.getMessage('deleteButtonText');
   deleteBtn.className = 'delete-group-btn delete-btn';
-  deleteBtn.title = `Delete folder "${folderName}"`;
+  deleteBtn.title = chrome.i18n.getMessage('deleteFolderTitle', [folderName]);
   deleteBtn.addEventListener('click', e => {
     e.stopPropagation();
     deleteFolder(folderName);
@@ -368,9 +368,9 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
 
   // Open group button
   const openBtn = document.createElement('button');
-  openBtn.textContent = 'Open';
+  openBtn.textContent = chrome.i18n.getMessage('openButtonText');
   openBtn.classList.add('open-btn');
-  openBtn.title = `Open all tabs in group "${groupName}"`;
+  openBtn.title = chrome.i18n.getMessage('openAllTabsGroupTitle', [groupName]);
   openBtn.addEventListener('click', e => {
     e.stopPropagation();
     tabs.forEach(tab => chrome.tabs.create({ url: tab.url }));
@@ -379,9 +379,9 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
 
   // Remove group from folder
   const removeBtn = document.createElement('button');
-  removeBtn.textContent = 'Remove';
+  removeBtn.textContent = chrome.i18n.getMessage('removeButtonText');
   removeBtn.className = 'remove-btn';
-  removeBtn.title = `Remove group from folder "${folderName}"`;
+  removeBtn.title = chrome.i18n.getMessage('removeGroupFromFolderTitle', [folderName]);
   removeBtn.addEventListener('click', e => {
     e.stopPropagation();
     removeGroupFromFolder(groupName, folderName);
@@ -393,9 +393,9 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
 
   // Delete group completely
   const deleteBtn = document.createElement('button');
-  deleteBtn.textContent = 'Delete';
+  deleteBtn.textContent = chrome.i18n.getMessage('deleteButtonText');
   deleteBtn.className = 'delete-group-btn delete-btn';
-  deleteBtn.title = `Delete group "${groupName}" completely`;
+  deleteBtn.title = chrome.i18n.getMessage('deleteGroupCompletelyTitle', [groupName]);
   deleteBtn.addEventListener('click', e => {
     e.stopPropagation();
     deleteGroup(groupName);
@@ -418,7 +418,7 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
       tabRow.classList.add('header-row');
 
       const titleSpan = document.createElement('span');
-      titleSpan.textContent = tab.title || tab.url || 'Untitled';
+      titleSpan.textContent = tab.title || tab.url || chrome.i18n.getMessage('untitledTabText');
       titleSpan.classList.add('name');
       tabRow.appendChild(titleSpan);
 
@@ -426,9 +426,9 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
       buttonsDivTab.classList.add('buttons');
 
       const openTabBtn = document.createElement('button');
-      openTabBtn.textContent = 'Open';
+      openTabBtn.textContent = chrome.i18n.getMessage('openButtonText');
       openTabBtn.classList.add('open-btn');
-      openTabBtn.title = 'Open tab';
+      openTabBtn.title = chrome.i18n.getMessage('openTabTitle');
       openTabBtn.addEventListener('click', e => {
         e.stopPropagation();
         chrome.tabs.create({ url: tab.url });
@@ -436,9 +436,9 @@ function createGroupListItemForFolderPanel(folderName, groupName, tabs) {
       buttonsDivTab.appendChild(openTabBtn);
 
       const deleteTabBtn = document.createElement('button');
-      deleteTabBtn.textContent = 'Delete';
+      deleteTabBtn.textContent = chrome.i18n.getMessage('deleteButtonText');
       deleteTabBtn.classList.add('delete-btn');
-      deleteTabBtn.title = 'Remove tab from group';
+      deleteTabBtn.title = chrome.i18n.getMessage('removeTabFromGroupTitle');
       deleteTabBtn.addEventListener('click', e => {
         e.stopPropagation();
         const groupTabs = storageData.groups[groupName];
